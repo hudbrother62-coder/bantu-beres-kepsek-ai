@@ -1,23 +1,23 @@
-# BantuBeres Kepsek AI v1
+# Bantu Beres Kepsek AI
 
-Next.js starter yang siap GitHub + Vercel.
+Asisten digital kepala sekolah untuk profil sekolah, perencanaan berbasis data,
+KSP, RKJM, RKT, RKAS, kurikulum, supervisi, pengelolaan kinerja, SOP, surat,
+notulen, program kerja, kehadiran guru, serta pustaka dokumen.
 
-Install:
+## Stack
 
-npm install
+- Next.js 16 + React 19
+- Supabase Auth, Postgres, dan Row Level Security
+- Gemini Flash dengan rotasi tiga API key dan model fallback
+- Vercel
 
-Run:
+## Menjalankan lokal
 
-npm run dev
+1. Salin `.env.example` menjadi `.env.local`.
+2. Isi URL dan publishable key Supabase.
+3. Isi minimal satu API key Gemini untuk hasil AI. Tanpa key, aplikasi memakai
+   mesin template transparan agar alur tetap dapat diuji.
+4. Jalankan `npm install`, lalu `npm run dev`.
 
-Deploy:
-1. Upload repository ke GitHub
-2. Import project ke Vercel
-3. Tambahkan Environment Variables:
-
-GEMINI_API_KEY_1
-GEMINI_API_KEY_2
-DATABASE_URL
-NEXTAUTH_SECRET
-
-API key Gemini hanya berada di server.
+Semua kunci Gemini hanya dibaca di server. Jangan menambahkan file `.env*`
+berisi nilai rahasia ke Git.
