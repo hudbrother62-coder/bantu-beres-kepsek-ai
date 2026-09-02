@@ -79,9 +79,9 @@ img { max-width: 100%; }
 
 .brand { display: inline-flex; align-items: center; gap: 11px; min-width: 0; text-decoration: none; }
 .brand-symbol { position: relative; width: 36px; height: 60px; flex: 0 0 36px; overflow: hidden; border-radius: 5px; background: #fff; }
-.brand-symbol img { position: absolute; width: 108px; max-width: none; height: 108px; left: -37px; top: -27px; }
+.brand-symbol img { position: absolute; width: 108px; max-width: none; height: 144px; left: -37px; top: -27px; }
 .brand-copy { min-width: 0; }
-.brand-name { white-space: nowrap; font-size: 1.08rem; font-weight: 600; letter-spacing: -.04em; }
+.brand-name { display: flex; gap: .16em; white-space: nowrap; font-size: 1.08rem; font-weight: 600; letter-spacing: -.04em; }
 .brand-name span:first-child { color: var(--purple); }
 .brand-name span:last-child { color: var(--blue); }
 .brand-product { margin-top: -1px; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
@@ -153,7 +153,7 @@ img { max-width: 100%; }
 .mini-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
 .mini-brand { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; }
 .mini-brand .brand-symbol { width: 22px; height: 37px; flex-basis: 22px; }
-.mini-brand .brand-symbol img { width: 67px; height: 67px; left: -23px; top: -17px; }
+.mini-brand .brand-symbol img { width: 67px; height: 89px; left: -23px; top: -17px; }
 .window-dots { display: flex; gap: 5px; }
 .window-dots span { width: 6px; height: 6px; border-radius: 50%; background: #cbd7e8; }
 .mini-hero { min-height: 144px; padding: 21px; border-radius: 20px; color: #fff; background: linear-gradient(125deg,#4d1668,#2653a5 60%,#2189c5); position: relative; overflow: hidden; }
@@ -669,7 +669,7 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
   .mobile-brand .brand-name { font-size: .9rem; }
   .mobile-brand .brand-product { display: none; }
   .mobile-brand .brand-symbol { width: 30px; height: 50px; flex-basis: 30px; }
-  .mobile-brand .brand-symbol img { width: 90px; height: 90px; left: -31px; top: -23px; }
+  .mobile-brand .brand-symbol img { width: 90px; height: 120px; left: -31px; top: -23px; }
   .global-search { display: none; }
   .top-actions .btn { display: none; }
   .icon-btn { width: 44px; height: 44px; }
