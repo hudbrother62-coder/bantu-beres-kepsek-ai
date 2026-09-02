@@ -6,13 +6,13 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/auth", "destination": "/index.html" },
-    { "source": "/onboarding", "destination": "/index.html" },
-    { "source": "/dashboard", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" },
-    { "source": "/documents", "destination": "/index.html" },
-    { "source": "/documents/:path*", "destination": "/index.html" },
-    { "source": "/ai", "destination": "/index.html" }
+    { "source": "/auth", "destination": "/" },
+    { "source": "/onboarding", "destination": "/" },
+    { "source": "/dashboard", "destination": "/" },
+    { "source": "/profile", "destination": "/" },
+    { "source": "/documents", "destination": "/" },
+    { "source": "/documents/:path*", "destination": "/" },
+    { "source": "/ai", "destination": "/" }
   ],
   "headers": [
     {

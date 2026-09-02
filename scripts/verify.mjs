@@ -43,7 +43,7 @@ for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {
 const vercel = JSON.parse(await readFile(resolve(root, "vercel.json"), "utf8"));
 if (vercel.framework !== null || vercel.outputDirectory !== "." || vercel.functions) throw new Error("Vercel must use the Other preset, root output, and no stale functions glob");
 for (const route of ["/auth","/onboarding","/dashboard","/profile","/documents","/documents/:path*","/ai"]) {
-  if (!vercel.rewrites?.some((rewrite) => rewrite.source === route && rewrite.destination === "/index.html")) {
+  if (!vercel.rewrites?.some((rewrite) => rewrite.source === route && rewrite.destination === "/")) {
     throw new Error(`Missing SPA rewrite for ${route}`);
   }
 }
