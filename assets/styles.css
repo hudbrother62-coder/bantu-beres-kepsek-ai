@@ -74,12 +74,14 @@ img { max-width: 100%; }
 .skip-link:focus { transform: none; }
 
 .boot-screen { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 15px; background: radial-gradient(circle at 70% 10%, rgba(141, 48, 159, .15), transparent 32%), radial-gradient(circle at 15% 85%, rgba(33, 135, 209, .16), transparent 34%), var(--canvas); }
+.boot-screen .brand-symbol { width: 72px; height: 86px; }
+.boot-screen .brand-symbol img { width: 216px; height: 216px; left: -74px; top: -54px; }
 .boot-screen p { margin: 0; color: var(--muted); font-size: .9rem; }
 .boot-spinner { width: 36px; height: 36px; border: 3px solid #dbe5f3; border-top-color: var(--purple); border-radius: 50%; animation: spin .8s linear infinite; }
 
 .brand { display: inline-flex; align-items: center; gap: 11px; min-width: 0; text-decoration: none; }
-.brand-symbol { position: relative; width: 36px; height: 60px; flex: 0 0 36px; overflow: hidden; border-radius: 5px; background: #fff; }
-.brand-symbol img { position: absolute; width: 108px; max-width: none; height: 144px; left: -37px; top: -27px; }
+.brand-symbol { position: relative; width: 36px; height: 44px; flex: 0 0 36px; overflow: hidden; border-radius: 5px; background: #fff; }
+.brand-symbol img { position: absolute; width: 108px; max-width: none; height: 108px; left: -37px; top: -27px; }
 .brand-copy { min-width: 0; }
 .brand-name { display: flex; gap: .16em; white-space: nowrap; font-size: 1.08rem; font-weight: 600; letter-spacing: -.04em; }
 .brand-name span:first-child { color: var(--purple); }
@@ -152,8 +154,8 @@ img { max-width: 100%; }
 .product-scene:hover .product-window { transform: rotateY(-1deg) translateY(-5px); }
 .mini-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
 .mini-brand { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; }
-.mini-brand .brand-symbol { width: 22px; height: 37px; flex-basis: 22px; }
-.mini-brand .brand-symbol img { width: 67px; height: 89px; left: -23px; top: -17px; }
+.mini-brand .brand-symbol { width: 22px; height: 27px; flex-basis: 22px; }
+.mini-brand .brand-symbol img { width: 67px; height: 67px; left: -23px; top: -17px; }
 .window-dots { display: flex; gap: 5px; }
 .window-dots span { width: 6px; height: 6px; border-radius: 50%; background: #cbd7e8; }
 .mini-hero { min-height: 144px; padding: 21px; border-radius: 20px; color: #fff; background: linear-gradient(125deg,#4d1668,#2653a5 60%,#2189c5); position: relative; overflow: hidden; }
@@ -668,8 +670,8 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
   .mobile-brand { display: flex; }
   .mobile-brand .brand-name { font-size: .9rem; }
   .mobile-brand .brand-product { display: none; }
-  .mobile-brand .brand-symbol { width: 30px; height: 50px; flex-basis: 30px; }
-  .mobile-brand .brand-symbol img { width: 90px; height: 120px; left: -31px; top: -23px; }
+  .mobile-brand .brand-symbol { width: 30px; height: 36px; flex-basis: 30px; }
+  .mobile-brand .brand-symbol img { width: 90px; height: 90px; left: -31px; top: -23px; }
   .global-search { display: none; }
   .top-actions .btn { display: none; }
   .icon-btn { width: 44px; height: 44px; }
