@@ -6,10 +6,13 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    {
-      "source": "/((?!api/|assets/|manifest\\.webmanifest$).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/auth", "destination": "/index.html" },
+    { "source": "/onboarding", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/documents", "destination": "/index.html" },
+    { "source": "/documents/:path*", "destination": "/index.html" },
+    { "source": "/ai", "destination": "/index.html" }
   ],
   "headers": [
     {
