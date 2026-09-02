@@ -19,6 +19,7 @@ const required = [
   "lib/supabase-auth.js",
   "lib/public-config.js",
   "supabase/migrations/20260902143000_kepsek_workspace_v1.sql",
+  "supabase/migrations/20260902230500_harden_agenda_privileges.sql",
   "vercel.json",
 ];
 
