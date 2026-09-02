@@ -35,6 +35,15 @@ const appSource = await readFile(resolve(root, "assets/app.js"), "utf8");
 if (!appSource.includes("AI belum diaktifkan") || !appSource.includes("kepsek_documents")) {
   throw new Error("AI paused state or isolated Supabase tables are missing");
 }
+if (appSource.includes("data-lucide") || appSource.includes("lucide@") || !appSource.includes("iconPaths")) {
+  throw new Error("Icons must use the bundled inline SVG renderer");
+}
+if (/priceCard|#harga|Paket sekolah|Mulai paket/i.test(appSource)) {
+  throw new Error("Pricing and package purchase UI must remain removed");
+}
+for (const expected of ['value="Negeri"', 'value="Swasta"', "status: values.status", "data-theme-toggle", "missingFields", "consistencyChecks"]) {
+  if (!appSource.includes(expected)) throw new Error(`Missing onboarding, theme, or AI review requirement: ${expected}`);
+}
 
 for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {
   JSON.parse(await readFile(resolve(root, file), "utf8"));

@@ -3,6 +3,17 @@ import { jsonBody, requireSchoolAccess, requireUser, sendError } from "../lib/su
 
 const allowedTypes = new Set(["ksp", "pbd", "rkjm", "rkt", "rkas", "activity", "sop", "performance"]);
 
+const outputBlueprints = {
+  ksp: ["Sampul dan lembar identitas", "Lembar penetapan (tanpa tanda tangan buatan)", "Karakteristik satuan pendidikan", "Visi, misi, dan tujuan", "Pengorganisasian pembelajaran", "Perencanaan pembelajaran", "Pendampingan, evaluasi, dan pengembangan profesional", "Lampiran dan daftar data yang perlu dilengkapi"],
+  pbd: ["Ringkasan kondisi mutu", "Indikator prioritas", "Identifikasi masalah", "Refleksi dan akar masalah", "Rekomendasi pembenahan", "Program prioritas", "Indikator keberhasilan dan target", "Rencana pemantauan"],
+  rkjm: ["Dasar penyusunan", "Profil dan kondisi sekolah", "Isu strategis empat tahunan", "Tujuan dan sasaran", "Matriks program, indikator, baseline, target per tahun, dan penanggung jawab", "Tahapan pelaksanaan", "Pemantauan dan evaluasi"],
+  rkt: ["Ringkasan prioritas tahunan", "Sasaran dan indikator", "Matriks program dan kegiatan", "Target, jadwal, penanggung jawab, sumber daya, dan bukti keberhasilan", "Risiko dan mitigasi", "Pemantauan dan tindak lanjut"],
+  rkas: ["Ringkasan hubungan RKT dan anggaran", "Matriks program, kegiatan, volume, satuan, perkiraan biaya, sumber dana, waktu, dan penanggung jawab", "Catatan kewajaran dan kelengkapan", "Daftar item yang wajib diverifikasi terhadap juknis BOSP dan ARKAS", "Peringatan bahwa hasil belum merupakan RKAS resmi"],
+  activity: ["Identitas dan tujuan kegiatan", "Program kegiatan", "Susunan panitia", "Draft SK panitia", "Draft surat tugas dan undangan", "Agenda dan daftar hadir", "Format notulen dan berita acara", "Format laporan serta evaluasi kegiatan", "Daftar lampiran/bukti"],
+  sop: ["Identitas SOP", "Tujuan", "Ruang lingkup", "Dasar/acuan yang diberikan", "Definisi dan peran", "Persyaratan", "Langkah kerja berurutan dengan pelaksana, waktu, keluaran, dan kendali mutu", "Risiko dan mitigasi", "Rekaman/dokumen pendukung", "Evaluasi SOP"],
+  performance: ["Ringkasan sasaran kinerja kepala sekolah", "Pemetaan aktivitas terhadap indikator", "Daftar bukti dukung", "Status kelengkapan bukti", "Refleksi berbasis fakta", "Rencana tindak lanjut", "Matriks akuntabilitas dan tenggat"],
+};
+
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ error: "Method not allowed" });
   response.setHeader("Cache-Control", "no-store, max-age=0");
@@ -31,6 +42,7 @@ export default async function handler(request, response) {
       profile_data: school.profile_data,
     }, null, 2);
 
+    const requiredSections = outputBlueprints[type];
     const systemInstruction = `Anda adalah KEPSEK AI, asisten penyusunan dokumen khusus kepala sekolah di Indonesia.
 Tugas Anda membantu menyusun DRAFT, bukan mengesahkan dokumen atau menggantikan sistem resmi pemerintah.
 
@@ -42,8 +54,12 @@ ATURAN WAJIB:
 5. Jaga konsistensi hubungan kondisi sekolah, prioritas, program, indikator, kegiatan, dan anggaran.
 6. Untuk RKAS/BOSP, nyatakan bahwa hasil adalah draft yang wajib diverifikasi terhadap regulasi dan dimasukkan ke ARKAS.
 7. Jangan membuat tanda tangan atau menyatakan dokumen telah disahkan.
-8. Kembalikan JSON valid tanpa markdown fence dengan struktur:
-{"title":"...","summary":"...","content":"dokumen lengkap dalam teks dengan judul dan bagian yang jelas","assumptions":["..."],"missingFields":["..."],"sources":["nama sumber yang benar-benar dipakai"],"consistencyChecks":[{"label":"...","status":"ok|warning","note":"..."}]}`;
+8. Gunakan susunan khusus berikut untuk jenis dokumen ini dan tulis setiap bagiannya secara substantif: ${requiredSections.map((section, index) => `${index + 1}. ${section}`).join("; ")}.
+9. Matriks harus ditulis sebagai tabel Markdown yang rapi. Setiap target harus terukur. Hubungkan setiap program dengan masalah/tujuan, indikator, target, waktu, penanggung jawab, dan bukti keberhasilan yang relevan.
+10. Bedakan secara tegas: fakta dari profil, fakta dari dokumen sumber, asumsi, dan data yang belum tersedia. Jangan menyebut acuan/regulasi tertentu jika tidak ada di sumber; tandai [PERLU DIKONFIRMASI].
+11. Mulai content dengan identitas dokumen, status DRAFT, nama sekolah, jenjang, NPSN, tahun pelajaran/periode jika tersedia, dan tanggal penyusunan. Gunakan heading Markdown yang jelas.
+12. Kembalikan JSON valid tanpa markdown fence dengan struktur persis berikut:
+{"title":"judul spesifik menyebut sekolah dan periode","summary":"ringkasan 2-4 kalimat berisi tujuan, prioritas, dan ruang lingkup draft","content":"dokumen lengkap dan rinci dalam Markdown","documentMeta":{"documentType":"...","schoolName":"...","academicYear":"...","generatedAt":"tanggal ISO","reviewStatus":"draft"},"keyDecisions":["keputusan atau prioritas utama yang terbaca dari data"],"assumptions":["asumsi yang digunakan; kosong jika tidak ada"],"missingFields":["data spesifik yang perlu dikonfirmasi; kosong jika lengkap"],"sources":["nama sumber yang benar-benar dipakai"],"consistencyChecks":[{"label":"Nama pemeriksaan","status":"ok|warning","note":"hasil pemeriksaan yang spesifik"}]}`;
 
     const result = await generateStructured({
       systemInstruction,
