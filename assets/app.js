@@ -19,6 +19,9 @@ const state = {
   loading: true,
   authNotice: null,
   pendingFiles: [],
+  calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth(),
+  selectedAgendaDate: "",
   theme: localStorage.getItem("bb-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
 };
 
@@ -55,6 +58,20 @@ const demoSources = [
   { id: "src-profile", name: "Profil Sekolah", mime_type: "application/json", status: "ready", summary: "Data identitas dan karakteristik sekolah", created_at: new Date().toISOString() },
   { id: "src-rapor", name: "Rapor Pendidikan 2025.pdf", mime_type: "application/pdf", status: "ready", summary: "Prioritas literasi dan kualitas pembelajaran", created_at: new Date().toISOString() },
   { id: "src-old-ksp", name: "KSP 2025-2026.docx", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", status: "ready", summary: "Dokumen kurikulum tahun sebelumnya", created_at: new Date().toISOString() },
+];
+
+function demoAgendaDate(dayOffset, hour, minute = 0) {
+  const value = new Date();
+  value.setDate(value.getDate() + dayOffset);
+  value.setHours(hour, minute, 0, 0);
+  return value.toISOString();
+}
+
+const demoAgendas = [
+  { id: "agenda-briefing", title: "Briefing pagi", description: "Koordinasi singkat kesiapan pembelajaran dan layanan sekolah.", starts_at: demoAgendaDate(0,8), ends_at: demoAgendaDate(0,8,30), status: "scheduled", priority: "normal", metadata: { category:"Rapat", location:"Ruang kepala sekolah", rundown:"08.00 Pembukaan\n08.10 Informasi penting\n08.20 Pembagian tindak lanjut" } },
+  { id: "agenda-ksp", title: "Review dokumen KSP", description: "Meninjau data, struktur, dan konsistensi KSP bersama tim pengembang.", starts_at: demoAgendaDate(0,10), ends_at: demoAgendaDate(0,11,30), status: "scheduled", priority: "high", metadata: { category:"Kurikulum", location:"Ruang rapat", rundown:"10.00 Cek profil sekolah\n10.30 Tinjau pengorganisasian pembelajaran\n11.00 Catat revisi" } },
+  { id: "agenda-literasi", title: "Rapat program literasi", description: "Menetapkan kegiatan, indikator, dan penanggung jawab program literasi.", starts_at: demoAgendaDate(0,13), ends_at: demoAgendaDate(0,14,30), status: "scheduled", priority: "normal", metadata: { category:"Perencanaan", location:"Ruang rapat", rundown:"13.00 Pemaparan kondisi\n13.30 Penetapan program\n14.00 Pembagian tugas" } },
+  { id: "agenda-supervisi", title: "Tindak lanjut supervisi", description: "Membahas hasil observasi dan rencana pendampingan.", starts_at: demoAgendaDate(1,9), ends_at: demoAgendaDate(1,10), status: "scheduled", priority: "high", metadata: { category:"Supervisi", location:"Ruang kepala sekolah", rundown:"09.00 Refleksi\n09.25 Rencana perbaikan\n09.45 Kesepakatan tindak lanjut" } },
 ];
 
 const aiTypes = {
@@ -190,6 +207,7 @@ function currentRoute() {
     "/auth": "auth",
     "/onboarding": "onboarding",
     "/dashboard": "dashboard",
+    "/calendar": "calendar",
     "/profile": "profile",
     "/documents": "documents",
     "/ai": "ai",
@@ -331,6 +349,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <nav class="side-menu" aria-label="Menu aplikasi">
         <div class="menu-label">Ruang kerja</div>
         ${navLink("/dashboard","Beranda","layout-dashboard",active === "dashboard")}
+        ${navLink("/calendar","Agenda & Kalender","calendar-days",active === "calendar")}
         ${navLink("/profile","Profil & Memori","database",active === "profile")}
         ${navLink("/ai?type=pbd","Mutu & PBD","chart-no-axes-combined",active === "pbd")}
         ${navLink("/ai?type=ksp","KSP & Kurikulum","book-open-check",active === "ksp")}
@@ -352,7 +371,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <main id="main-content" class="content">${content}</main>
       <nav class="mobile-bottom" aria-label="Navigasi mobile">
         <a class="mobile-nav-item ${active === "dashboard" ? "active" : ""}" href="/dashboard" data-route>${icon("home")}Beranda</a>
-        <a class="mobile-nav-item" href="/dashboard#agenda" data-route>${icon("calendar-days")}Agenda</a>
+        <a class="mobile-nav-item ${active === "calendar" ? "active" : ""}" href="/calendar" data-route>${icon("calendar-days")}Agenda</a>
         <a class="mobile-nav-item ${["ksp","pbd","planning","rkas","activity","performance"].includes(active) ? "active" : ""}" href="/ai" data-route>${icon("sparkles")}Fitur AI</a>
         <a class="mobile-nav-item ${active === "documents" ? "active" : ""}" href="/documents" data-route>${icon("folder")}Dokumen</a>
       </nav>
@@ -365,6 +384,11 @@ function renderDashboard() {
   const principal = school.principal_name || "Kepala Sekolah";
   const docs = state.documents.length ? state.documents : demoDocuments;
   const completion = calculateCompletion(school);
+  const todayKey = localDateKey(new Date());
+  const todayAgendas = agendasForDate(todayKey);
+  const upcomingAgendas = currentAgendas().filter((agenda) => new Date(agenda.starts_at) >= startOfToday()).slice(0,3);
+  const timeline = todayAgendas.length ? todayAgendas.map((agenda) => agendaTimelineItem(agenda)).join("") : `<div class="agenda-empty compact"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada agenda hari ini</strong><small>Tambahkan kegiatan agar rundown harian tersusun.</small><button class="btn btn-secondary" data-add-agenda data-date="${todayKey}">${icon("plus")} Tambah agenda</button></div>`;
+  const priorityRows = upcomingAgendas.length ? upcomingAgendas.map((agenda) => priorityAgendaItem(agenda)).join("") : `<button class="priority" data-add-agenda data-date="${todayKey}"><span class="priority-icon tone-blue">${icon("calendar-days")}</span><span><strong>Susun agenda pertama</strong><small>Tambahkan rapat, supervisi, atau kegiatan sekolah.</small></span><span class="priority-time">Tambah</span></button>`;
   document.title = "Beranda — Bantu Beres KEPSEK AI";
   const content = `<section class="command-hero">
     <div class="welcome-row"><div class="welcome"><small>Selamat datang, ${escapeHtml(principal)} 👋</small><h1>Siap membantu pekerjaan sekolah hari ini.</h1><p>Ada ${docs.filter((doc) => doc.status !== "approved").length || 3} dokumen yang masih perlu ditinjau.</p></div><div class="completion"><div class="completion-ring" style="--completion:${completion}%"><span>${completion}%</span></div><div><small>Kelengkapan workspace</small><strong>${completion >= 80 ? "Sudah baik" : "Hampir siap"}</strong></div></div></div>
@@ -372,11 +396,9 @@ function renderDashboard() {
   </section>
   <div class="dashboard-columns">
     <div>
-      <section class="panel"><div class="panel-head"><div><h2>Prioritas hari ini</h2><p>Disusun dari agenda, dokumen, dan tenggat sekolah</p></div><button class="panel-link">Lihat agenda</button></div>
+      <section class="panel"><div class="panel-head"><div><h2>Agenda terdekat</h2><p>Hari ini, besok, dan kegiatan berikutnya</p></div><button class="panel-link" data-route-to="/calendar">Lihat kalender</button></div>
         <div class="priority-list">
-          <button class="priority" data-open-ai="ksp"><span class="priority-icon tone-purple">${icon("book-open-check")}</span><span><strong>Tinjau KSP Tahun ${escapeHtml(school.academic_year || "2026/2027")}</strong><small>Periksa kembali data dan konsistensi dokumen</small></span><span class="priority-time">10.00<span class="badge badge-amber">Penting</span></span></button>
-          <button class="priority"><span class="priority-icon tone-blue">${icon("users")}</span><span><strong>Rapat program penguatan literasi</strong><small>Ruang rapat • tim pengembang sekolah</small></span><span class="priority-time">13.00</span></button>
-          <button class="priority" data-open-ai="performance"><span class="priority-icon tone-green">${icon("file-check-2")}</span><span><strong>Lengkapi bukti dukung kinerja</strong><small>Pemetaan aktivitas dan dokumen akuntabilitas</small></span><span class="priority-time">Besok</span></button>
+          ${priorityRows}
         </div>
       </section>
       <div class="shortcuts">
@@ -386,13 +408,180 @@ function renderDashboard() {
         ${quickCard("activity","folder-kanban","Administrasi kegiatan","SK sampai laporan")}
       </div>
     </div>
-    <aside id="agenda" class="panel today-panel"><div class="panel-head"><div><h2>Hari ini</h2><p>Agenda kepala sekolah</p></div><button class="panel-link" data-add-agenda>${icon("plus")}</button></div>
-      <div class="datebox"><span class="date-number">${String(new Date().getDate()).padStart(2,"0")}</span><div><strong>${new Intl.DateTimeFormat("id-ID",{weekday:"long",month:"long"}).format(new Date())}</strong><small>3 agenda • 1 tenggat</small></div></div>
-      <div class="timeline"><div class="event now"><time>08.00</time><strong>Briefing pagi</strong><small>Ruang kepala sekolah</small></div><div class="event"><time>10.00</time><strong>Review dokumen KSP</strong><small>Bersama tim pengembang</small></div><div class="event"><time>13.00</time><strong>Rapat program literasi</strong><small>Ruang rapat</small></div></div>
+    <aside id="agenda" class="panel today-panel"><div class="panel-head"><div><h2>Hari ini</h2><p>Rundown kepala sekolah</p></div><button class="panel-link add-round" data-add-agenda data-date="${todayKey}">${icon("plus")}<span>Tambah</span></button></div>
+      <div class="datebox"><span class="date-number">${String(new Date().getDate()).padStart(2,"0")}</span><div><strong>${new Intl.DateTimeFormat("id-ID",{weekday:"long",month:"long"}).format(new Date())}</strong><small>${todayAgendas.length} agenda terjadwal</small></div></div>
+      <div class="timeline">${timeline}</div>
+      <button class="calendar-cta" data-route-to="/calendar">${icon("calendar-days")}<span><strong>Buka kalender lengkap</strong><small>Lihat dan edit agenda satu tahun</small></span>${icon("arrow-right")}</button>
       <div class="memory-health"><div class="memory-heading"><span>Memori Sekolah</span><strong>${completion}% lengkap</strong></div><div class="progress-track"><div class="progress-fill" style="--progress:${completion}%"></div></div><small>Lengkapi profil dan dokumen untuk hasil AI yang lebih spesifik.</small></div>
     </aside>
   </div>`;
   app.innerHTML = appShell(content, "dashboard", "Beranda Kepala Sekolah");
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function localDateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+function currentAgendas() {
+  return [...(state.agendas || [])].sort((a,b) => new Date(a.starts_at) - new Date(b.starts_at));
+}
+
+function agendasForDate(dateKey) {
+  return currentAgendas().filter((agenda) => localDateKey(agenda.starts_at) === dateKey && agenda.status !== "cancelled");
+}
+
+function agendaTimelineItem(agenda) {
+  const time = new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(agenda.starts_at));
+  const location = agenda.metadata?.location || agenda.description || "Detail belum ditambahkan";
+  return `<button class="event ${agenda.priority === "high" ? "now" : ""}" data-edit-agenda="${escapeHtml(agenda.id)}"><time>${escapeHtml(time)}</time><strong>${escapeHtml(agenda.title)}</strong><small>${escapeHtml(location)}</small></button>`;
+}
+
+function priorityAgendaItem(agenda) {
+  const starts = new Date(agenda.starts_at);
+  const today = localDateKey(new Date());
+  const tomorrowDate = new Date(); tomorrowDate.setDate(tomorrowDate.getDate()+1);
+  const dayLabel = localDateKey(starts) === today ? new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).format(starts) : localDateKey(starts) === localDateKey(tomorrowDate) ? "Besok" : new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"short"}).format(starts);
+  return `<button class="priority" data-edit-agenda="${escapeHtml(agenda.id)}"><span class="priority-icon ${agenda.priority === "high" ? "tone-purple" : "tone-blue"}">${icon("calendar-days")}</span><span><strong>${escapeHtml(agenda.title)}</strong><small>${escapeHtml(agenda.metadata?.location || agenda.metadata?.category || "Agenda sekolah")}</small></span><span class="priority-time">${escapeHtml(dayLabel)}${agenda.priority === "high" ? '<span class="badge badge-amber">Penting</span>' : ""}</span></button>`;
+}
+
+function renderCalendar() {
+  const now = new Date();
+  const todayKey = localDateKey(now);
+  if (!state.selectedAgendaDate) state.selectedAgendaDate = todayKey;
+  let selected = new Date(`${state.selectedAgendaDate}T12:00:00`);
+  if (selected.getFullYear() !== state.calendarYear) {
+    state.selectedAgendaDate = `${state.calendarYear}-${String(state.calendarMonth+1).padStart(2,"0")}-01`;
+    selected = new Date(`${state.selectedAgendaDate}T12:00:00`);
+  }
+  state.calendarMonth = selected.getMonth();
+  const yearAgendas = currentAgendas().filter((agenda) => new Date(agenda.starts_at).getFullYear() === state.calendarYear && agenda.status !== "cancelled");
+  const monthAgendas = yearAgendas.filter((agenda) => new Date(agenda.starts_at).getMonth() === state.calendarMonth);
+  const selectedAgendas = agendasForDate(state.selectedAgendaDate);
+  const monthName = new Intl.DateTimeFormat("id-ID",{month:"long"}).format(new Date(state.calendarYear,state.calendarMonth,1));
+  const monthCards = Array.from({length:12},(_,month) => {
+    const count = yearAgendas.filter((agenda) => new Date(agenda.starts_at).getMonth() === month).length;
+    const label = new Intl.DateTimeFormat("id-ID",{month:"short"}).format(new Date(state.calendarYear,month,1));
+    return `<button class="year-month ${month === state.calendarMonth ? "active" : ""}" data-calendar-month="${month}"><span>${escapeHtml(label)}</span><strong>${count}</strong><small>agenda</small></button>`;
+  }).join("");
+  const firstDay = new Date(state.calendarYear,state.calendarMonth,1);
+  const daysInMonth = new Date(state.calendarYear,state.calendarMonth+1,0).getDate();
+  const leading = (firstDay.getDay()+6)%7;
+  const dayCells = ["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map((day) => `<span class="weekday">${day}</span>`);
+  for (let blank=0; blank<leading; blank++) dayCells.push('<span class="calendar-blank" aria-hidden="true"></span>');
+  for (let day=1; day<=daysInMonth; day++) {
+    const dateKey = `${state.calendarYear}-${String(state.calendarMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const count = monthAgendas.filter((agenda) => localDateKey(agenda.starts_at) === dateKey).length;
+    dayCells.push(`<button class="calendar-day ${dateKey === todayKey ? "today" : ""} ${dateKey === state.selectedAgendaDate ? "selected" : ""} ${count ? "has-events" : ""}" data-calendar-date="${dateKey}" aria-label="${day} ${escapeHtml(monthName)}, ${count} agenda"><span>${day}</span>${count ? `<small>${count}</small>` : ""}</button>`);
+  }
+  const rundownRows = selectedAgendas.length ? selectedAgendas.map(agendaRundownCard).join("") : `<div class="agenda-empty"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada kegiatan</strong><small>Jadwal pada tanggal ini masih kosong.</small><button class="btn btn-primary" data-add-agenda data-date="${state.selectedAgendaDate}">${icon("plus")} Tambah kegiatan</button></div>`;
+  const selectedLabel = new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(selected);
+  document.title = "Agenda & Kalender — Bantu Beres";
+  const content = `<div class="page-intro calendar-intro"><div><h1>Agenda & Kalender Sekolah</h1><p>Susun kegiatan kepala sekolah sepanjang tahun dan lihat rundown setiap hari.</p></div><button class="btn btn-primary" data-add-agenda data-date="${state.selectedAgendaDate}">${icon("plus")} Tambah agenda</button></div>
+    <section class="calendar-toolbar panel"><div class="year-switch"><button class="icon-btn" data-calendar-year="${state.calendarYear-1}" aria-label="Tahun sebelumnya">${icon("arrow-left")}</button><div><small>Tahun agenda</small><strong>${state.calendarYear}</strong></div><button class="icon-btn" data-calendar-year="${state.calendarYear+1}" aria-label="Tahun berikutnya">${icon("arrow-right")}</button></div><div class="calendar-summary"><span><strong>${yearAgendas.length}</strong><small>Agenda tahun ini</small></span><span><strong>${monthAgendas.length}</strong><small>Bulan terpilih</small></span><button class="btn btn-secondary" data-calendar-today>Ke hari ini</button></div></section>
+    <section class="year-overview"><div class="section-heading-inline"><div><h2>Kalender ${state.calendarYear}</h2><p>Pilih bulan untuk melihat tanggal dan kegiatannya.</p></div></div><div class="year-month-grid">${monthCards}</div></section>
+    <div class="calendar-workspace">
+      <section class="panel month-panel"><div class="panel-head"><div><h2>${escapeHtml(monthName)} ${state.calendarYear}</h2><p>Pilih tanggal untuk membuka rundown</p></div><button class="panel-link" data-add-agenda data-date="${state.selectedAgendaDate}">${icon("plus")} Tambah</button></div><div class="month-calendar">${dayCells.join("")}</div><div class="calendar-legend"><span><i></i>Hari ini</span><span><i></i>Ada agenda</span></div></section>
+      <aside class="panel rundown-panel"><div class="panel-head"><div><h2>Rundown harian</h2><p>${escapeHtml(selectedLabel)}</p></div><span class="badge badge-purple">${selectedAgendas.length} kegiatan</span></div><div class="rundown-list">${rundownRows}</div></aside>
+    </div>`;
+  app.innerHTML = appShell(content,"calendar","Agenda & Kalender");
+}
+
+function agendaRundownCard(agenda) {
+  const start = new Date(agenda.starts_at);
+  const end = agenda.ends_at ? new Date(agenda.ends_at) : null;
+  const time = new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).format(start);
+  const endTime = end ? new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).format(end) : "Selesai";
+  const metadata = agenda.metadata || {};
+  const rundown = String(metadata.rundown || agenda.description || "Belum ada rincian rundown.").split(/\n+/).filter(Boolean);
+  return `<article class="rundown-card ${agenda.priority === "high" ? "important" : ""}"><div class="rundown-time"><strong>${escapeHtml(time)}</strong><small>${escapeHtml(endTime)}</small></div><div class="rundown-body"><div class="rundown-title"><div><span class="agenda-category">${escapeHtml(metadata.category || "Kegiatan")}</span><h3>${escapeHtml(agenda.title)}</h3></div><button class="edit-agenda" data-edit-agenda="${escapeHtml(agenda.id)}">Edit</button></div>${metadata.location ? `<p class="agenda-location">${escapeHtml(metadata.location)}</p>` : ""}<ol>${rundown.slice(0,5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></div></article>`;
+}
+
+function openAgendaDialog(agendaId = "", requestedDate = "") {
+  const agenda = currentAgendas().find((item) => item.id === agendaId);
+  const start = agenda ? new Date(agenda.starts_at) : new Date(`${requestedDate || state.selectedAgendaDate || localDateKey(new Date())}T08:00:00`);
+  const end = agenda?.ends_at ? new Date(agenda.ends_at) : new Date(start.getTime()+60*60*1000);
+  const metadata = agenda?.metadata || {};
+  const timeValue = (date) => `${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
+  const modal = `<div class="dialog-backdrop" id="agenda-dialog"><section class="dialog agenda-dialog" role="dialog" aria-modal="true" aria-labelledby="agenda-dialog-title"><div class="dialog-head"><div><h2 id="agenda-dialog-title">${agenda ? "Edit agenda" : "Tambah agenda"}</h2><p>${agenda ? "Perbarui jadwal dan rundown kegiatan." : "Isi yang penting dulu; detail lain boleh menyusul."}</p></div><button class="btn btn-ghost compact-button" type="button" data-dialog-close>Batal</button></div><form id="agenda-form" data-agenda-id="${escapeHtml(agenda?.id || "")}"><div class="field-grid agenda-form-grid"><div class="form-group field-span"><label for="agenda-title">Nama kegiatan</label><input class="form-control" id="agenda-title" name="title" value="${escapeHtml(agenda?.title || "")}" placeholder="Contoh: Rapat evaluasi program" minlength="3" required></div><div class="form-group"><label for="agenda-date">Tanggal</label><input class="form-control" id="agenda-date" name="date" type="date" value="${localDateKey(start)}" required></div><div class="form-group"><label for="agenda-category">Jenis kegiatan</label><select class="form-control" id="agenda-category" name="category">${["Rapat","Supervisi","Kurikulum","Perencanaan","Kinerja","Kegiatan","Lainnya"].map((item) => `<option ${metadata.category === item ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="form-group"><label for="agenda-start">Mulai</label><input class="form-control" id="agenda-start" name="startTime" type="time" value="${timeValue(start)}" required></div><div class="form-group"><label for="agenda-end">Selesai</label><input class="form-control" id="agenda-end" name="endTime" type="time" value="${timeValue(end)}"></div><div class="form-group field-span"><label for="agenda-location">Tempat <small>(opsional)</small></label><input class="form-control" id="agenda-location" name="location" value="${escapeHtml(metadata.location || "")}" placeholder="Contoh: Ruang rapat"></div><div class="form-group field-span"><label for="agenda-description">Catatan singkat <small>(opsional)</small></label><textarea class="form-control" id="agenda-description" name="description" placeholder="Tujuan atau hal penting yang perlu diingat">${escapeHtml(agenda?.description || "")}</textarea></div><div class="form-group field-span"><label for="agenda-rundown">Rundown detail <small>(satu baris untuk setiap urutan)</small></label><textarea class="form-control rundown-input" id="agenda-rundown" name="rundown" placeholder="08.00 Pembukaan\n08.15 Pembahasan utama\n09.00 Tindak lanjut">${escapeHtml(metadata.rundown || "")}</textarea></div><div class="form-group"><label for="agenda-priority">Prioritas</label><select class="form-control" id="agenda-priority" name="priority"><option value="normal" ${agenda?.priority !== "high" ? "selected" : ""}>Biasa</option><option value="high" ${agenda?.priority === "high" ? "selected" : ""}>Penting</option><option value="low" ${agenda?.priority === "low" ? "selected" : ""}>Rendah</option></select></div><div class="form-group"><label for="agenda-status">Status</label><select class="form-control" id="agenda-status" name="status"><option value="scheduled" ${agenda?.status !== "completed" ? "selected" : ""}>Terjadwal</option><option value="completed" ${agenda?.status === "completed" ? "selected" : ""}>Selesai</option><option value="cancelled" ${agenda?.status === "cancelled" ? "selected" : ""}>Dibatalkan</option></select></div></div><div id="agenda-error" class="form-error" role="alert" hidden></div><div class="dialog-actions">${agenda ? '<button class="btn btn-danger" type="button" data-delete-agenda>Hapus</button>' : '<span></span>'}<button class="btn btn-primary" type="submit">${icon("save")} Simpan agenda</button></div></form></section></div>`;
+  app.insertAdjacentHTML("beforeend",modal);
+  document.body.classList.add("dialog-open");
+  bindAgendaDialog();
+  app.querySelector("#agenda-title")?.focus();
+}
+
+function closeAgendaDialog() {
+  app.querySelector("#agenda-dialog")?.remove();
+  document.body.classList.remove("dialog-open");
+}
+
+function bindAgendaDialog() {
+  const dialog = app.querySelector("#agenda-dialog");
+  dialog?.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click",closeAgendaDialog));
+  dialog?.addEventListener("click",(event) => { if (event.target === dialog) closeAgendaDialog(); });
+  dialog?.querySelector("#agenda-form")?.addEventListener("submit",handleAgendaSubmit);
+  dialog?.querySelector("[data-delete-agenda]")?.addEventListener("click",deleteAgenda);
+}
+
+async function handleAgendaSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const errorBox = form.querySelector("#agenda-error");
+  const submit = form.querySelector("button[type=submit]");
+  const values = Object.fromEntries(new FormData(form));
+  errorBox.hidden = true; submit.disabled = true;
+  try {
+    if (!form.reportValidity()) throw new Error("Lengkapi nama, tanggal, dan waktu mulai.");
+    const startsAt = new Date(`${values.date}T${values.startTime}:00`);
+    const endsAt = values.endTime ? new Date(`${values.date}T${values.endTime}:00`) : null;
+    if (endsAt && endsAt < startsAt) throw new Error("Waktu selesai tidak boleh lebih awal dari waktu mulai.");
+    const existing = currentAgendas().find((item) => item.id === form.dataset.agendaId);
+    const payload = { title:values.title.trim(), description:values.description?.trim() || null, starts_at:startsAt.toISOString(), ends_at:endsAt?.toISOString() || null, status:values.status, priority:values.priority, metadata:{ ...(existing?.metadata || {}), category:values.category, location:values.location?.trim() || "", rundown:values.rundown?.trim() || "" } };
+    let saved;
+    if (state.demo || !state.supabase) {
+      saved = existing ? { ...existing,...payload,updated_at:new Date().toISOString() } : { id:crypto.randomUUID(),school_id:state.school?.id,created_by:state.user?.id,...payload,created_at:new Date().toISOString(),updated_at:new Date().toISOString() };
+    } else if (existing) {
+      const { data,error } = await state.supabase.from("kepsek_agendas").update(payload).eq("id",existing.id).eq("school_id",state.school.id).select().single();
+      if (error) throw error; saved = data;
+    } else {
+      const { data,error } = await state.supabase.from("kepsek_agendas").insert({ school_id:state.school.id,created_by:state.user.id,...payload }).select().single();
+      if (error) throw error; saved = data;
+    }
+    state.agendas = existing ? state.agendas.map((item) => item.id === existing.id ? saved : item) : [...state.agendas,saved];
+    state.selectedAgendaDate = values.date;
+    state.calendarYear = startsAt.getFullYear(); state.calendarMonth = startsAt.getMonth();
+    closeAgendaDialog(); toast(existing ? "Agenda berhasil diperbarui" : "Agenda berhasil ditambahkan");
+    currentRoute() === "calendar" ? renderCalendar() : renderDashboard(); bindPageEvents();
+  } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; submit.disabled = false; }
+}
+
+async function deleteAgenda() {
+  const form = app.querySelector("#agenda-form");
+  const agenda = currentAgendas().find((item) => item.id === form?.dataset.agendaId);
+  if (!agenda || !window.confirm(`Hapus agenda “${agenda.title}”? Tindakan ini tidak dapat dibatalkan.`)) return;
+  try {
+    if (!state.demo && state.supabase) {
+      const { error } = await state.supabase.from("kepsek_agendas").delete().eq("id",agenda.id).eq("school_id",state.school.id);
+      if (error) throw error;
+    }
+    state.agendas = state.agendas.filter((item) => item.id !== agenda.id);
+    closeAgendaDialog(); toast("Agenda berhasil dihapus"); renderCalendar(); bindPageEvents();
+  } catch (cause) { toast(humanError(cause),"error"); }
+}
+
+async function loadAgendasForYear(year) {
+  if (state.demo || !state.supabase || !state.school) return;
+  const start = new Date(year,0,1).toISOString();
+  const end = new Date(year+1,0,1).toISOString();
+  const { data,error } = await state.supabase.from("kepsek_agendas").select("*").eq("school_id",state.school.id).gte("starts_at",start).lt("starts_at",end).order("starts_at",{ascending:true});
+  if (error) throw error;
+  state.agendas = data || [];
 }
 
 function quickCard(type, iconName, title, subtitle) {
@@ -460,23 +649,25 @@ function renderAi() {
   const aiEnabled = Boolean(state.config?.aiConfigured);
   const sources = state.sources.length ? state.sources : demoSources;
   document.title = `${type.label} — Bantu Beres KEPSEK AI`;
-  const contextRows = sources.slice(0,4).map((source) => `<div class="source-row"><span class="source-icon">${icon("file-check-2")}</span><span><strong>${escapeHtml(source.name)}</strong><small>${escapeHtml(source.summary || "Sumber siap digunakan")}</small></span>${icon("circle-check")}</div>`).join("");
-  const content = `<div class="page-intro"><div><h1>${escapeHtml(type.label)}</h1><p>${escapeHtml(type.description)}</p></div></div>
-    <div class="ai-studio-layout">
-      <section class="ai-compose">
-        <div class="compose-head"><div class="eyebrow"><span class="eyebrow-dot"></span>${aiEnabled ? "KEPSEK AI siap membantu" : "Pratinjau fitur AI"}</div><h1>${escapeHtml(type.title)}</h1><p>Sampaikan kebutuhan dengan bahasa sehari-hari. Data sekolah yang relevan akan ditambahkan otomatis.</p></div>
-        ${aiEnabled ? "" : `<div class="ai-paused-banner">${icon("shield-check")}<span><strong>AI belum diaktifkan</strong><small>Tampilan dan alur sudah dapat diperiksa. Setelah AI aktif, hasil akan berisi dokumen lengkap, ringkasan keputusan, data yang dipakai, bagian yang perlu dikonfirmasi, dan pemeriksaan konsistensi.</small></span></div>`}
+  const sourceChips = sources.slice(0,4).map((source) => `<span class="source-chip">${icon("file-check-2")}${escapeHtml(source.name)}</span>`).join("");
+  const content = `<div class="page-intro compact-intro"><div><h1>${escapeHtml(type.label)}</h1><p>${escapeHtml(type.description)}</p></div></div>
+    <div class="ai-simple-shell">
+      <div class="ai-steps" aria-label="Tahapan pembuatan dokumen"><span class="active"><b>1</b>Pilih dokumen</span><span><b>2</b>Jelaskan kebutuhan</span><span><b>3</b>Tinjau hasil</span></div>
+      <section class="ai-compose ai-compose-simple">
+        <div class="compose-head"><div class="eyebrow"><span class="eyebrow-dot"></span>${aiEnabled ? "KEPSEK AI siap membantu" : "Pratinjau fitur AI"}</div><h1>${escapeHtml(type.title)}</h1><p>Cukup pilih dokumen dan jelaskan kebutuhan. Profil serta data sekolah akan dipakai otomatis.</p></div>
+        ${aiEnabled ? "" : `<div class="ai-paused-banner">${icon("shield-check")}<span><strong>AI belum diaktifkan</strong><small>Formulir sudah siap digunakan. Setelah API AI diaktifkan, tombol susun draft akan otomatis tersedia.</small></span></div>`}
         <form id="ai-form">
-          <div class="compose-body"><div class="form-group"><label for="ai-type">Jenis pekerjaan</label><select class="form-control" id="ai-type" name="type">${Object.entries(aiTypes).map(([key,item]) => `<option value="${key}" ${key === state.aiType ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></div>
-            <label class="form-group"><span style="display:block;margin-bottom:8px;font-size:.84rem;font-weight:700">Instruksi Anda</span><span class="smart-input"><textarea id="ai-prompt" name="prompt" required>${escapeHtml(defaultPrompt(state.aiType))}</textarea><span class="smart-tools"><small>Semakin spesifik, hasil semakin sesuai.</small><span class="tool-buttons"><button type="button" class="tool-btn" aria-label="Lampirkan file">${icon("paperclip")}</button><button type="button" class="tool-btn" aria-label="Gunakan suara">${icon("mic")}</button></span></span></span></label>
-            <div class="template-grid"><button type="button" class="template-card selected" data-template="Gunakan seluruh data terverifikasi dan buat dokumen baru dari awal."><strong>Buat dari awal</strong><small>Gunakan seluruh data terverifikasi.</small></button><button type="button" class="template-card" data-template="Perbarui dokumen sebelumnya dan pertahankan bagian yang masih relevan."><strong>Perbarui dokumen lama</strong><small>Pertahankan bagian yang masih relevan.</small></button></div>
+          <div class="compose-body simple-compose-body">
+            <div class="simple-form-step"><span class="step-badge">1</span><div class="form-group"><label for="ai-type">Dokumen yang ingin dibuat</label><select class="form-control" id="ai-type" name="type">${Object.entries(aiTypes).map(([key,item]) => `<option value="${key}" ${key === state.aiType ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></div></div>
+            <div class="simple-form-step"><span class="step-badge">2</span><label class="form-group"><span class="input-label">Apa yang ingin disusun?</span><span class="smart-input"><textarea id="ai-prompt" name="prompt" required>${escapeHtml(defaultPrompt(state.aiType))}</textarea><span class="smart-tools"><small>Tulis dengan bahasa sehari-hari.</small><span class="tool-buttons"><button type="button" class="tool-btn" aria-label="Lampirkan file">${icon("paperclip")}</button><button type="button" class="tool-btn" aria-label="Gunakan suara">${icon("mic")}</button></span></span></span></label></div>
+            <details class="advanced-options"><summary>Pengaturan tambahan</summary><div class="template-grid"><button type="button" class="template-card selected" data-template="Gunakan seluruh data terverifikasi dan buat dokumen baru dari awal."><strong>Buat dari awal</strong><small>Gunakan semua data sekolah.</small></button><button type="button" class="template-card" data-template="Perbarui dokumen sebelumnya dan pertahankan bagian yang masih relevan."><strong>Perbarui dokumen lama</strong><small>Pertahankan bagian yang relevan.</small></button></div></details>
+            <div class="memory-strip"><span class="memory-strip-icon">${icon("brain-circuit")}</span><span><strong>Memori sekolah terhubung</strong><small>${sources.length + 1} sumber dari ${escapeHtml((state.school || demoSchool).name)}</small></span><details><summary>Lihat sumber</summary><div class="source-chips">${sourceChips}</div></details></div>
           </div>
-          <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Model AI siap • sumber terhubung" : "AI belum aktif • mode pratinjau"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun draft" : "Segera tersedia"}</button></div>
+          <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Siap menyusun dan memeriksa draft" : "AI belum aktif"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun draft" : "Segera tersedia"}</button></div>
         </form>
         <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun draft…</h2><p>KEPSEK AI membaca profil, sumber sekolah, dan memeriksa konsistensi hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca Profil Sekolah</div><div class="processing-item"><span>✓</span>Menghubungkan sumber relevan</div><div class="processing-item"><span>•</span>Menyusun dan memeriksa draft</div></div></div>
         <div class="generation-done" id="generation-done"><span class="done-icon">${icon("file-check-2")}</span><h2>Draft berhasil disusun</h2><p>Dokumen masih berstatus draft dan perlu ditinjau kepala sekolah sebelum digunakan.</p><div class="result-preview"><strong id="result-title">${escapeHtml(type.label)}</strong><small id="result-summary">Draft siap ditinjau dan diedit.</small></div><div id="result-details" class="result-details"></div><div class="result-actions"><button class="btn btn-secondary" id="generate-again">Buat ulang</button><button class="btn btn-primary" id="open-result">Tinjau dan edit ${icon("arrow-right")}</button></div></div>
       </section>
-      <aside class="context-column"><div class="context-summary"><span>${icon("brain-circuit")} Memori Sekolah</span><strong>${sources.length + 1} sumber siap digunakan</strong><small>Semua sumber berasal dari workspace ${escapeHtml((state.school || demoSchool).name)}.</small></div><section class="panel"><div class="panel-head"><div><h2>Sumber terhubung</h2><p>Data yang akan dipakai AI</p></div></div><div class="source-list">${contextRows}</div></section></aside>
     </div>`;
   app.innerHTML = appShell(content, activeForType(state.aiType), type.label);
 }
@@ -568,7 +759,7 @@ async function route(options = {}) {
     navigate("/onboarding");
     return;
   }
-  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, profile: renderProfile, documents: renderDocuments, ai: renderAi, "document-editor": renderDocumentEditor })[routeName]?.();
+  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, "document-editor": renderDocumentEditor })[routeName]?.();
   bindPageEvents();
   refreshIcons(app);
   if (!options.preserveScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -581,6 +772,12 @@ function bindPageEvents() {
   app.querySelectorAll("[data-new-document]").forEach((button) => button.addEventListener("click", () => navigate("/ai")));
   app.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", logout));
   app.querySelectorAll("[data-theme-toggle]").forEach((button) => button.addEventListener("click", toggleTheme));
+  app.querySelectorAll("[data-add-agenda]").forEach((button) => button.addEventListener("click", () => openAgendaDialog("",button.dataset.date || state.selectedAgendaDate || localDateKey(new Date()))));
+  app.querySelectorAll("[data-edit-agenda]").forEach((button) => button.addEventListener("click", () => openAgendaDialog(button.dataset.editAgenda)));
+  app.querySelectorAll("[data-calendar-date]").forEach((button) => button.addEventListener("click", () => { state.selectedAgendaDate = button.dataset.calendarDate; state.calendarMonth = new Date(`${state.selectedAgendaDate}T12:00:00`).getMonth(); renderCalendar(); bindPageEvents(); }));
+  app.querySelectorAll("[data-calendar-month]").forEach((button) => button.addEventListener("click", () => { state.calendarMonth = Number(button.dataset.calendarMonth); state.selectedAgendaDate = `${state.calendarYear}-${String(state.calendarMonth+1).padStart(2,"0")}-01`; renderCalendar(); bindPageEvents(); }));
+  app.querySelectorAll("[data-calendar-year]").forEach((button) => button.addEventListener("click", async () => { try { state.calendarYear = Number(button.dataset.calendarYear); state.selectedAgendaDate = `${state.calendarYear}-${String(state.calendarMonth+1).padStart(2,"0")}-01`; await loadAgendasForYear(state.calendarYear); renderCalendar(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); } }));
+  app.querySelector("[data-calendar-today]")?.addEventListener("click", async () => { try { const today = new Date(); state.calendarYear = today.getFullYear(); state.calendarMonth = today.getMonth(); state.selectedAgendaDate = localDateKey(today); await loadAgendasForYear(state.calendarYear); renderCalendar(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); } });
   app.querySelector("[data-back-login]")?.addEventListener("click", () => { state.authNotice = null; renderAuth(); bindPageEvents(); });
 
   const authTabs = app.querySelectorAll("[data-auth-mode]");
@@ -636,6 +833,7 @@ async function handleAuth(event) {
       state.school = demoSchool;
       state.documents = [...demoDocuments];
       state.sources = [...demoSources];
+      state.agendas = [...demoAgendas];
       navigate("/dashboard");
       return;
     }
@@ -885,11 +1083,13 @@ async function loadWorkspace() {
   state.membership = data ? { role:"owner" } : null;
   state.school = normalizeSchool(data);
   if (!state.school) return;
+  const calendarStart = new Date(state.calendarYear,0,1).toISOString();
+  const calendarEnd = new Date(state.calendarYear+1,0,1).toISOString();
   const [docs,sources,projects,agendas] = await Promise.all([
     state.supabase.from("kepsek_documents").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_sources").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}),
     state.supabase.from("kepsek_projects").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
-    state.supabase.from("kepsek_agendas").select("*").eq("school_id",state.school.id).gte("starts_at",new Date(Date.now()-86400000).toISOString()).order("starts_at",{ascending:true}).limit(20),
+    state.supabase.from("kepsek_agendas").select("*").eq("school_id",state.school.id).gte("starts_at",calendarStart).lt("starts_at",calendarEnd).order("starts_at",{ascending:true}),
   ]);
   state.documents = docs.data || []; state.sources = sources.data || []; state.projects = projects.data || []; state.agendas = agendas.data || [];
 }

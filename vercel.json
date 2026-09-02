@@ -9,6 +9,7 @@
     { "source": "/auth", "destination": "/" },
     { "source": "/onboarding", "destination": "/" },
     { "source": "/dashboard", "destination": "/" },
+    { "source": "/calendar", "destination": "/" },
     { "source": "/profile", "destination": "/" },
     { "source": "/documents", "destination": "/" },
     { "source": "/documents/:path*", "destination": "/" },
