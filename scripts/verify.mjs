@@ -41,7 +41,7 @@ for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {
 }
 
 const vercel = JSON.parse(await readFile(resolve(root, "vercel.json"), "utf8"));
-if (vercel.framework !== null || vercel.functions) throw new Error("Vercel must use the Other preset without a stale functions glob");
+if (vercel.framework !== null || vercel.outputDirectory !== "." || vercel.functions) throw new Error("Vercel must use the Other preset, root output, and no stale functions glob");
 
 const logo = await readFile(resolve(root, "assets/bantu-beres-logo.jpg"));
 const logoHash = createHash("sha256").update(logo).digest("hex");
