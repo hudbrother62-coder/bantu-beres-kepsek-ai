@@ -1,0 +1,18 @@
+{
+  "name": "Bantu Beres KEPSEK AI",
+  "short_name": "KEPSEK AI",
+  "description": "Asisten kerja kepala sekolah dari data hingga dokumen.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fd",
+  "theme_color": "#f4f7fd",
+  "lang": "id-ID",
+  "icons": [
+    {
+      "src": "/assets/bantu-beres-logo.jpg",
+      "sizes": "1536x1536",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
