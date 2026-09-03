@@ -1,6 +1,7 @@
 import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "/assets/document-format.js";
 import { renderAiText } from "/assets/ai-text-format.js";
 import { isIdleSession, SESSION_IDLE_MS } from "/assets/session-policy.js";
+import { scoreSupervision, SUPERVISION_SCORES, supervisionInstruments } from "/assets/supervision-instruments.js";
 
 const app = document.querySelector("#app");
 const toastRegion = document.querySelector("#toast-region");
@@ -24,6 +25,8 @@ const state = {
   teamMembers: [],
   workspaceInvites: [],
   templateFolders: [],
+  teachers: [],
+  supervisions: [],
   assistantMessages: [],
   assistantSending: false,
   assistantDraft: "",
@@ -115,6 +118,15 @@ const demoTeamMembers = [
 
 const demoTemplateFolders = [
   { id:"folder-demo", name:"Format Khusus SDN Harapan Bangsa", category:"Folder sekolah", description:"Template internal yang tetap tersimpan di Google Drive sekolah.", drive_url:"https://drive.google.com/drive/folders/1EEoLPNgaLdnPdzJLvgxx_TVgvV7_E3DO" },
+];
+
+const demoTeachers = [
+  { id:"teacher-demo-1", full_name:"Siti Rahmawati, S.Pd.", nip:"198706122012032004", subject:"Guru Kelas", class_assignment:"Kelas IV", status:"active" },
+  { id:"teacher-demo-2", full_name:"Andi Pratama, S.Pd.", nip:"", subject:"Matematika", class_assignment:"Kelas V–VI", status:"active" },
+];
+
+const demoSupervisions = [
+  { id:"supervision-demo-1", teacher_id:"teacher-demo-1", supervisor_id:"demo-user", instrument_key:"atp", scheduled_at:new Date().toISOString(), status:"planned", class_semester:"Kelas IV / Semester 1", subject:"Guru Kelas", topic:"ATP Semester 1", responses:{}, total_score:0, max_score:24, final_score:0, rating:"Perlu Pembinaan", overall_notes:"", follow_up:"" },
 ];
 
 const assistantSuggestions = [
@@ -269,6 +281,7 @@ function currentRoute() {
     "/documents": "documents",
     "/ai": "ai",
     "/assistant": "assistant",
+    "/supervision": "supervision",
     "/team": "team",
     "/templates": "templates",
     "/guide": "guide",
@@ -427,6 +440,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         ${navLink("/ai?type=rkas","RKAS Assistant","wallet-cards",active === "rkas")}
         <div class="menu-label">Pengelolaan</div>
         ${navLink("/ai?type=activity","Program & Kegiatan","folder-kanban",active === "activity")}
+        ${navLink("/supervision","Supervisi Akademik","clipboard-check",active === "supervision")}
         ${navLink("/ai?type=performance","Kinerja Kepala Sekolah","briefcase-business",active === "performance")}
         ${navLink("/documents","Pusat Dokumen","files",active === "documents")}
         <div class="menu-label">Referensi & bantuan</div>
@@ -447,7 +461,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         <a class="mobile-nav-item ${active === "assistant" ? "active" : ""}" href="/assistant" data-route>${icon("brain-circuit")}Asisten</a>
         <a class="mobile-nav-item ${active === "calendar" ? "active" : ""}" href="/calendar" data-route>${icon("calendar-days")}Agenda</a>
         <a class="mobile-nav-item ${active === "documents" ? "active" : ""}" href="/documents" data-route>${icon("folder")}Dokumen</a>
-        <a class="mobile-nav-item ${["more","team","templates","guide","profile","ksp","pbd","planning","rkas","activity","performance"].includes(active) ? "active" : ""}" href="/more" data-route>${icon("menu")}Menu</a>
+        <a class="mobile-nav-item ${["more","team","templates","guide","profile","ksp","pbd","planning","rkas","activity","performance","supervision"].includes(active) ? "active" : ""}" href="/more" data-route>${icon("menu")}Menu</a>
       </nav>
     </div>
   </div>`;
@@ -894,6 +908,142 @@ async function removeTemplateFolder(id) {
   } catch (cause) { toast(humanError(cause),"error"); }
 }
 
+function currentTeachers() { return state.teachers.length ? state.teachers : (state.demo ? demoTeachers : []); }
+function currentSupervisions() { return state.supervisions.length ? state.supervisions : (state.demo ? demoSupervisions : []); }
+function teacherName(id) { return currentTeachers().find((teacher) => teacher.id === id)?.full_name || "Guru belum ditemukan"; }
+function supervisionStatusLabel(status) { return ({ planned:"Terjadwal", in_progress:"Sedang diisi", completed:"Selesai", follow_up:"Tindak lanjut" })[status] || "Terjadwal"; }
+
+function renderSupervision() {
+  const id = new URLSearchParams(window.location.search).get("id");
+  const selected = id ? currentSupervisions().find((entry) => entry.id === id) : null;
+  document.title = `Supervisi Akademik — ${APP_NAME}`;
+  if (selected) { renderSupervisionAssessment(selected); return; }
+  const teachers = currentTeachers();
+  const entries = currentSupervisions().slice().sort((a,b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
+  const completed = entries.filter((entry) => entry.status === "completed" || entry.status === "follow_up");
+  const followUps = entries.filter((entry) => entry.status === "follow_up");
+  const teacherCards = teachers.map((teacher) => {
+    const latest = entries.find((entry) => entry.teacher_id === teacher.id);
+    return `<article class="teacher-card"><span class="teacher-avatar">${escapeHtml(initials(teacher.full_name))}</span><div><strong>${escapeHtml(teacher.full_name)}</strong><small>${escapeHtml([teacher.subject,teacher.class_assignment].filter(Boolean).join(" • ") || "Data mengajar belum diisi")}</small></div><span class="teacher-result">${latest ? `<b>${Number(latest.final_score || 0).toLocaleString("id-ID")}</b><small>${escapeHtml(supervisionStatusLabel(latest.status))}</small>` : `<b>—</b><small>Belum dinilai</small>`}</span><button class="btn btn-secondary compact-button" data-new-supervision="${escapeHtml(teacher.id)}">Mulai</button></article>`;
+  }).join("");
+  const history = entries.map((entry) => `<button class="supervision-row" data-open-supervision="${escapeHtml(entry.id)}"><span class="supervision-row-icon">${icon("clipboard-check")}</span><span><strong>${escapeHtml(teacherName(entry.teacher_id))}</strong><small>${escapeHtml(supervisionInstruments[entry.instrument_key]?.shortLabel || "Instrumen supervisi")} • ${formatDate(entry.scheduled_at)}</small></span><span class="badge ${entry.status === "completed" ? "badge-green" : entry.status === "follow_up" ? "badge-amber" : "badge-neutral"}">${escapeHtml(supervisionStatusLabel(entry.status))}</span><b class="supervision-score">${entry.status === "planned" ? "—" : Number(entry.final_score || 0).toLocaleString("id-ID")}</b>${icon("arrow-right")}</button>`).join("");
+  const content = `<div class="page-intro supervision-intro"><div><span class="page-kicker">Kendali mutu pembelajaran</span><h1>Supervisi Akademik</h1><p>Kelola seluruh guru tanpa kewalahan: jadwalkan, isi instrumen resmi, catat temuan, dan berikan hasilnya dalam Word atau PDF.</p></div><div class="page-actions"><button class="btn btn-secondary" data-add-teacher>${icon("user-plus")} Tambah guru</button><button class="btn btn-primary" data-new-supervision>${icon("plus")} Mulai supervisi</button></div></div>
+    <div class="supervision-stats"><div class="stat"><span class="stat-icon">${icon("users")}</span><div><small>Guru terdata</small><strong>${teachers.length}</strong></div></div><div class="stat"><span class="stat-icon">${icon("clipboard-check")}</span><div><small>Supervisi selesai</small><strong>${completed.length}</strong></div></div><div class="stat"><span class="stat-icon">${icon("calendar-days")}</span><div><small>Terjadwal</small><strong>${entries.filter((entry) => entry.status === "planned").length}</strong></div></div><div class="stat"><span class="stat-icon">${icon("route")}</span><div><small>Perlu tindak lanjut</small><strong>${followUps.length}</strong></div></div></div>
+    <section class="supervision-workflow"><span><b>1</b><small>Pilih guru dan instrumen</small></span><span>${icon("arrow-right")}</span><span><b>2</b><small>Nilai setiap indikator</small></span><span>${icon("arrow-right")}</span><span><b>3</b><small>Simpan dan cetak hasil</small></span></section>
+    <div class="supervision-layout"><section class="panel"><div class="panel-head"><div><h2>Daftar guru</h2><p>Pilih Mulai untuk membuat penilaian baru.</p></div><button class="text-link" data-add-teacher>Tambah guru ${icon("plus")}</button></div>${teacherCards ? `<div class="teacher-list">${teacherCards}</div>` : `<div class="empty-state small-empty-state">${icon("users")}<h3>Belum ada data guru</h3><p>Tambahkan guru satu kali, lalu gunakan kembali untuk setiap supervisi.</p><button class="btn btn-primary" data-add-teacher>Tambah guru pertama</button></div>`}</section><section class="panel"><div class="panel-head"><div><h2>Riwayat & jadwal</h2><p>${entries.length} kegiatan supervisi</p></div><a class="text-link" href="https://drive.google.com/drive/folders/1bwXV5zWnLO7R9fI8D7Z7z21KCTUQ89Tu" target="_blank" rel="noopener">Lihat format asli ${icon("external-link")}</a></div>${history ? `<div class="supervision-history">${history}</div>` : `<div class="small-empty">${icon("clipboard-check")}<span><strong>Belum ada supervisi</strong><small>Mulai dari tombol di atas.</small></span></div>`}</section></div>`;
+  app.innerHTML = appShell(content,"supervision","Supervisi Akademik");
+}
+
+function renderSupervisionAssessment(entry) {
+  const instrument = supervisionInstruments[entry.instrument_key];
+  if (!instrument) { navigate("/supervision"); return; }
+  const teacher = currentTeachers().find((item) => item.id === entry.teacher_id);
+  const score = scoreSupervision(entry.responses || {},instrument.items.length);
+  let lastGroup = "";
+  const rows = instrument.items.map((indicator) => {
+    const response = entry.responses?.[indicator.id] || {};
+    const group = indicator.group !== lastGroup ? `<h2 class="indicator-group">${escapeHtml(indicator.group)}</h2>` : "";
+    lastGroup = indicator.group;
+    return `${group}<article class="indicator-card" data-indicator="${indicator.id}"><span class="indicator-number">${indicator.id}</span><div class="indicator-body"><p>${escapeHtml(indicator.text)}</p><div class="score-options" role="radiogroup" aria-label="Penilaian indikator ${indicator.id}">${SUPERVISION_SCORES.map((option) => `<label class="score-choice ${option.tone}"><input type="radio" name="score-${indicator.id}" value="${option.value}" ${Number(response.score) === option.value ? "checked" : ""}><span><b>${option.value}</b>${option.label}</span></label>`).join("")}</div><label class="indicator-note">Catatan indikator <textarea class="form-control" data-indicator-note="${indicator.id}" placeholder="Tuliskan bukti, temuan, atau saran perbaikan…">${escapeHtml(response.note || "")}</textarea></label></div></article>`;
+  }).join("");
+  const content = `<div class="assessment-heading"><button class="btn btn-ghost compact-button" data-route-to="/supervision">${icon("arrow-left")} Kembali</button><div><span class="page-kicker">${escapeHtml(instrument.shortLabel)}</span><h1>${escapeHtml(teacher?.full_name || "Guru")}</h1><p>${escapeHtml([entry.subject,entry.class_semester,formatDate(entry.scheduled_at)].filter(Boolean).join(" • "))}</p></div><a class="btn btn-secondary compact-button" href="${instrument.sourceUrl}" target="_blank" rel="noopener">Format asli ${icon("external-link")}</a></div>
+    <section class="assessment-summary"><div class="score-ring" data-score-ring style="--score:${score.percent}"><strong data-score-percent>${score.percent}</strong><small>Nilai</small></div><div><strong data-score-progress>${score.answered} dari ${instrument.items.length} indikator terisi</strong><p>Skor <span data-score-total>${score.total}</span> dari ${score.max} • <span data-score-rating>${score.rating}</span></p></div><div class="assessment-summary-actions"><button class="btn btn-secondary" data-save-supervision>${icon("save")} Simpan</button><button class="btn btn-primary" data-complete-supervision>${icon("circle-check")} Selesaikan</button></div></section>
+    <section class="assessment-info"><div><small>Sekolah</small><strong>${escapeHtml((state.school || demoSchool).name)}</strong></div><div><small>Guru</small><strong>${escapeHtml(teacher?.full_name || "-")}</strong></div><div><small>Mata pelajaran</small><strong>${escapeHtml(entry.subject || teacher?.subject || "-")}</strong></div><div><small>Kelas/Semester</small><strong>${escapeHtml(entry.class_semester || teacher?.class_assignment || "-")}</strong></div></section>
+    <form id="supervision-assessment" data-supervision-id="${escapeHtml(entry.id)}" class="assessment-form">${rows}<section class="panel assessment-notes"><h2>Kesimpulan dan tindak lanjut</h2><div class="field-grid"><div class="form-group field-span"><label for="overall-notes">Catatan umum hasil supervisi</label><textarea class="form-control" id="overall-notes" placeholder="Tuliskan kekuatan, area perbaikan, dan bukti utama…">${escapeHtml(entry.overall_notes || "")}</textarea></div><div class="form-group field-span"><label for="follow-up">Rencana tindak lanjut</label><textarea class="form-control" id="follow-up" placeholder="Contoh: coaching penyusunan ATP pada 12 September…">${escapeHtml(entry.follow_up || "")}</textarea></div></div></section></form>
+    ${(entry.status === "completed" || entry.status === "follow_up") ? `<section class="assessment-export"><div><strong>Hasil siap diberikan kepada guru</strong><small>Unduh format rapi tanpa simbol AI.</small></div><button class="btn btn-secondary" data-export-supervision="docx">${icon("file-down")} Word</button><button class="btn btn-secondary" data-export-supervision="pdf">${icon("file-text")} PDF</button></section>` : ""}
+    <div class="assessment-mobile-bar"><span><strong data-mobile-score>${score.percent}</strong><small>Nilai sementara</small></span><button class="btn btn-primary" data-save-supervision>${icon("save")} Simpan</button></div>`;
+  app.innerHTML = appShell(content,"supervision","Penilaian Supervisi");
+}
+
+function openTeacherDialog() {
+  const modal = `<div class="dialog-backdrop" id="teacher-dialog"><section class="dialog small-dialog" role="dialog" aria-modal="true"><div class="dialog-head"><div><h2>Tambah data guru</h2><p>Data ini dapat dipakai ulang pada semua instrumen.</p></div><button class="btn btn-ghost compact-button" data-dialog-close>Batal</button></div><form id="teacher-form"><div class="form-group"><label for="teacher-name">Nama lengkap guru</label><input class="form-control" id="teacher-name" name="fullName" minlength="2" required></div><div class="form-group"><label for="teacher-nip">NIP <small>(opsional)</small></label><input class="form-control" id="teacher-nip" name="nip"></div><div class="form-group"><label for="teacher-subject">Mata pelajaran / tugas</label><input class="form-control" id="teacher-subject" name="subject" placeholder="Contoh: Guru Kelas"></div><div class="form-group"><label for="teacher-class">Kelas yang diampu</label><input class="form-control" id="teacher-class" name="classAssignment" placeholder="Contoh: Kelas IV"></div><div id="teacher-error" class="form-error" hidden></div><div class="dialog-actions"><span></span><button class="btn btn-primary" type="submit">${icon("save")} Simpan guru</button></div></form></section></div>`;
+  app.insertAdjacentHTML("beforeend",modal); document.body.classList.add("dialog-open"); bindSupervisionDialogs(); app.querySelector("#teacher-name")?.focus();
+}
+
+function openNewSupervisionDialog(teacherId = "") {
+  const teachers = currentTeachers();
+  if (!teachers.length) { openTeacherDialog(); toast("Tambahkan data guru terlebih dahulu","error"); return; }
+  const options = teachers.map((teacher) => `<option value="${escapeHtml(teacher.id)}" ${teacher.id === teacherId ? "selected" : ""}>${escapeHtml(teacher.full_name)}</option>`).join("");
+  const instruments = Object.values(supervisionInstruments).map((item) => `<option value="${item.key}">${escapeHtml(item.shortLabel)} • ${item.items.length} indikator</option>`).join("");
+  const modal = `<div class="dialog-backdrop" id="supervision-dialog"><section class="dialog" role="dialog" aria-modal="true"><div class="dialog-head"><div><h2>Mulai supervisi baru</h2><p>Pilih guru dan instrumen. Semua catatan dapat disimpan bertahap.</p></div><button class="btn btn-ghost compact-button" data-dialog-close>Batal</button></div><form id="new-supervision-form"><div class="field-grid"><div class="form-group"><label for="supervision-teacher">Guru</label><select class="form-control" id="supervision-teacher" name="teacherId" required><option value="">Pilih guru</option>${options}</select></div><div class="form-group"><label for="supervision-instrument">Instrumen</label><select class="form-control" id="supervision-instrument" name="instrumentKey" required>${instruments}</select></div><div class="form-group"><label for="supervision-date">Tanggal</label><input class="form-control" id="supervision-date" name="date" type="date" value="${localDateKey(new Date())}" required></div><div class="form-group"><label for="supervision-subject">Mata pelajaran</label><input class="form-control" id="supervision-subject" name="subject"></div><div class="form-group"><label for="supervision-class">Kelas / Semester</label><input class="form-control" id="supervision-class" name="classSemester"></div><div class="form-group"><label for="supervision-topic">Materi / Topik <small>(opsional)</small></label><input class="form-control" id="supervision-topic" name="topic"></div></div><div id="supervision-error" class="form-error" hidden></div><div class="dialog-actions"><span></span><button class="btn btn-primary" type="submit">Buka instrumen ${icon("arrow-right")}</button></div></form></section></div>`;
+  app.insertAdjacentHTML("beforeend",modal); document.body.classList.add("dialog-open"); bindSupervisionDialogs();
+}
+
+function closeSupervisionDialog() { app.querySelector("#teacher-dialog, #supervision-dialog")?.remove(); document.body.classList.remove("dialog-open"); }
+function bindSupervisionDialogs() {
+  app.querySelectorAll("#teacher-dialog [data-dialog-close], #supervision-dialog [data-dialog-close]").forEach((button) => button.addEventListener("click",closeSupervisionDialog));
+  app.querySelector("#teacher-form")?.addEventListener("submit",handleTeacherCreate);
+  app.querySelector("#new-supervision-form")?.addEventListener("submit",handleSupervisionCreate);
+}
+
+async function handleTeacherCreate(event) {
+  event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); const submit = event.currentTarget.querySelector("button[type=submit]"); const errorBox = event.currentTarget.querySelector("#teacher-error"); submit.disabled = true;
+  try {
+    const payload = { school_id:state.school.id, created_by:state.user.id, full_name:String(values.fullName).trim(), nip:String(values.nip || "").trim() || null, subject:String(values.subject || "").trim() || null, class_assignment:String(values.classAssignment || "").trim() || null };
+    let saved = { id:crypto.randomUUID(),...payload,status:"active",created_at:new Date().toISOString() };
+    if (!state.demo && state.supabase) { const { data,error } = await state.supabase.from("kepsek_teachers").insert(payload).select().single(); if (error) throw error; saved = data; }
+    state.teachers.push(saved); closeSupervisionDialog(); renderSupervision(); bindPageEvents(); toast("Data guru berhasil ditambahkan");
+  } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; submit.disabled = false; }
+}
+
+async function handleSupervisionCreate(event) {
+  event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); const submit = event.currentTarget.querySelector("button[type=submit]"); const errorBox = event.currentTarget.querySelector("#supervision-error"); submit.disabled = true;
+  try {
+    const instrument = supervisionInstruments[values.instrumentKey];
+    const payload = { school_id:state.school.id, teacher_id:values.teacherId, supervisor_id:state.user.id, instrument_key:values.instrumentKey, scheduled_at:new Date(`${values.date}T08:00:00`).toISOString(), status:"in_progress", class_semester:String(values.classSemester || "").trim() || null, subject:String(values.subject || "").trim() || null, topic:String(values.topic || "").trim() || null, responses:{}, total_score:0, max_score:instrument.items.length * 2, final_score:0, rating:"Perlu Pembinaan", source_url:instrument.sourceUrl };
+    let saved = { id:crypto.randomUUID(),...payload };
+    if (!state.demo && state.supabase) { const { data,error } = await state.supabase.from("kepsek_supervisions").insert(payload).select().single(); if (error) throw error; saved = data; }
+    state.supervisions.unshift(saved); closeSupervisionDialog(); navigate(`/supervision?id=${encodeURIComponent(saved.id)}`);
+  } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; submit.disabled = false; }
+}
+
+function readSupervisionForm(entry) {
+  const instrument = supervisionInstruments[entry.instrument_key]; const responses = {};
+  instrument.items.forEach((indicator) => { const checked = app.querySelector(`input[name="score-${indicator.id}"]:checked`); const note = app.querySelector(`[data-indicator-note="${indicator.id}"]`)?.value.trim() || ""; if (checked || note) responses[indicator.id] = { score:checked ? Number(checked.value) : null,note }; });
+  const score = scoreSupervision(responses,instrument.items.length);
+  return { responses,score,overall_notes:app.querySelector("#overall-notes")?.value.trim() || "",follow_up:app.querySelector("#follow-up")?.value.trim() || "" };
+}
+
+function updateSupervisionScore(entry) {
+  const { score } = readSupervisionForm(entry);
+  app.querySelectorAll("[data-score-percent], [data-mobile-score]").forEach((node) => { node.textContent = score.percent.toLocaleString("id-ID"); });
+  const progress = app.querySelector("[data-score-progress]"); if (progress) progress.textContent = `${score.answered} dari ${score.max / 2} indikator terisi`;
+  const total = app.querySelector("[data-score-total]"); if (total) total.textContent = score.total;
+  const rating = app.querySelector("[data-score-rating]"); if (rating) rating.textContent = score.rating;
+  const ring = app.querySelector("[data-score-ring]"); if (ring) ring.style.setProperty("--score",score.percent);
+}
+
+async function saveSupervision(entry,complete = false) {
+  const result = readSupervisionForm(entry);
+  if (complete && !result.score.complete) { toast(`Lengkapi ${result.score.max / 2 - result.score.answered} indikator sebelum menyelesaikan.`,`error`); return; }
+  const status = complete ? (result.follow_up ? "follow_up" : "completed") : "in_progress";
+  const payload = { responses:result.responses,total_score:result.score.total,max_score:result.score.max,final_score:result.score.percent,rating:result.score.rating,overall_notes:result.overall_notes || null,follow_up:result.follow_up || null,status,completed_at:complete ? new Date().toISOString() : null };
+  try {
+    if (!state.demo && state.supabase) { const { error } = await state.supabase.from("kepsek_supervisions").update(payload).eq("id",entry.id).eq("school_id",state.school.id); if (error) throw error; }
+    Object.assign(entry,payload); state.supervisions = state.supervisions.map((item) => item.id === entry.id ? entry : item); toast(complete ? "Supervisi selesai dan siap diekspor" : "Progres supervisi tersimpan");
+    if (complete) { renderSupervisionAssessment(entry); bindPageEvents(); }
+  } catch (cause) { toast(humanError(cause),"error"); }
+}
+
+async function exportSupervision(entry,format) {
+  const instrument = supervisionInstruments[entry.instrument_key]; const teacher = currentTeachers().find((item) => item.id === entry.teacher_id); const rows = instrument.items.map((indicator) => { const response = entry.responses?.[indicator.id] || {}; return [indicator.id,indicator.group,indicator.text,response.score ?? "-",response.note || ""]; });
+  toast(`Menyiapkan hasil supervisi ${format.toUpperCase()}…`);
+  try {
+    if (format === "docx") {
+      const { AlignmentType,Document,Packer,Paragraph,Table,TableCell,TableRow,TextRun,WidthType } = await import("https://esm.sh/docx@9.5.1?bundle");
+      const cell = (text,bold=false) => new TableCell({ children:[new Paragraph({ children:[new TextRun({ text:String(text),bold,size:18 })] })] });
+      const children = [new Paragraph({ alignment:AlignmentType.CENTER,children:[new TextRun({ text:instrument.title.toUpperCase(),bold:true,size:26 })] }),new Paragraph({ children:[new TextRun({ text:`Nama Sekolah: ${(state.school || demoSchool).name}\nNama Guru: ${teacher?.full_name || "-"}\nMata Pelajaran: ${entry.subject || teacher?.subject || "-"}\nKelas/Semester: ${entry.class_semester || teacher?.class_assignment || "-"}\nTanggal: ${formatDate(entry.scheduled_at)}`,size:21 })] }),new Table({ width:{ size:100,type:WidthType.PERCENTAGE },rows:[new TableRow({ tableHeader:true,children:[cell("No",true),cell("Komponen / Indikator",true),cell("Nilai",true),cell("Catatan",true)] }),...rows.map((row) => new TableRow({ children:[cell(row[0]),cell(`${row[1]}\n${row[2]}`),cell(row[3]),cell(row[4])] }))] }),new Paragraph({ children:[new TextRun({ text:`Jumlah: ${entry.total_score} dari ${entry.max_score}\nNilai Akhir: ${entry.final_score}\nPredikat: ${entry.rating}\n\nCatatan Umum: ${entry.overall_notes || "-"}\nTindak Lanjut: ${entry.follow_up || "-"}`,bold:true,size:21 })] })];
+      downloadBlob(await Packer.toBlob(new Document({ sections:[{ children }] })),`${safeFilename(`Hasil Supervisi ${teacher?.full_name || "Guru"}`)}.docx`);
+    } else {
+      const { jsPDF } = await import("https://esm.sh/jspdf@2.5.2?bundle"); const autoTable = (await import("https://esm.sh/jspdf-autotable@3.8.4?bundle")).default; const pdf = new jsPDF({ unit:"mm",format:"a4" });
+      pdf.setFontSize(13); pdf.setFont("helvetica","bold"); pdf.text(instrument.title,105,16,{ align:"center",maxWidth:175 }); pdf.setFontSize(9); pdf.setFont("helvetica","normal"); pdf.text([`Sekolah: ${(state.school || demoSchool).name}`,`Guru: ${teacher?.full_name || "-"}`,`Mata Pelajaran: ${entry.subject || teacher?.subject || "-"}`,`Kelas/Semester: ${entry.class_semester || teacher?.class_assignment || "-"}`,`Tanggal: ${formatDate(entry.scheduled_at)}`],16,28);
+      autoTable(pdf,{ startY:52,head:[["No","Komponen / Indikator","Nilai","Catatan"]],body:rows.map((row) => [row[0],`${row[1]}\n${row[2]}`,row[3],row[4]]),styles:{ fontSize:7,cellPadding:1.7,valign:"top" },headStyles:{ fillColor:[53,72,105] },columnStyles:{ 0:{ cellWidth:9 },2:{ cellWidth:13 },3:{ cellWidth:42 } } });
+      let y = (pdf.lastAutoTable?.finalY || 55) + 7; if (y > 250) { pdf.addPage(); y = 20; } pdf.setFont("helvetica","bold"); pdf.setFontSize(10); pdf.text(`Jumlah ${entry.total_score}/${entry.max_score}  •  Nilai ${entry.final_score}  •  ${entry.rating}`,16,y); pdf.setFont("helvetica","normal"); pdf.setFontSize(9); pdf.text(pdf.splitTextToSize(`Catatan Umum: ${entry.overall_notes || "-"}\nTindak Lanjut: ${entry.follow_up || "-"}`,178),16,y+7); pdf.save(`${safeFilename(`Hasil Supervisi ${teacher?.full_name || "Guru"}`)}.pdf`);
+    }
+    toast("Hasil supervisi berhasil dibuat");
+  } catch (cause) { toast(`Ekspor gagal: ${humanError(cause)}`,"error"); }
+}
+
 function renderGuide() {
   document.title = `Panduan Kerja — ${APP_NAME}`;
   const steps = [
@@ -901,8 +1051,9 @@ function renderGuide() {
     ["2","Hubungkan tim tepercaya","Undang operator, wakasek, atau tim supervisi memakai email mereka sendiri.","/team","Atur Tim Sekolah"],
     ["3","Simpan sumber dan format","Unggah data sekolah ke Memori dan tautkan folder format asli di Google Drive.","/templates","Buka Pustaka Format"],
     ["4","Susun agenda kerja","Masukkan kegiatan setahun, rundown harian, tempat, lalu pilih penanggung jawab.","/calendar","Atur Agenda"],
-    ["5","Buat dan tinjau dokumen","Pilih jenis dokumen, jelaskan kebutuhan, lalu periksa asumsi dan bagian yang kosong.","/ai","Mulai menyusun"],
-    ["6","Setujui dan ekspor","Edit hasil bersama tim, ubah status menjadi disetujui, lalu unduh Word, Excel, atau PDF.","/documents","Buka Pusat Dokumen"],
+    ["5","Jalankan supervisi akademik","Tambahkan data guru, pilih instrumen, isi penilaian dan catatan, lalu tetapkan tindak lanjut.","/supervision","Buka Supervisi"],
+    ["6","Buat dan tinjau dokumen","Pilih jenis dokumen, jelaskan kebutuhan, lalu periksa asumsi dan bagian yang kosong.","/ai","Mulai menyusun"],
+    ["7","Setujui dan ekspor","Edit hasil bersama tim, ubah status menjadi disetujui, lalu unduh Word, Excel, atau PDF.","/documents","Buka Pusat Dokumen"],
   ];
   const content = `<div class="guide-hero"><div><span class="page-kicker">Panduan satu halaman</span><h1>Dari persiapan sampai dokumen selesai</h1><p>Ikuti urutan ini saat pertama kali menggunakan aplikasi. Setelah itu, pekerjaan harian cukup dimulai dari Beranda atau Agenda.</p></div><span class="guide-hero-icon">${icon("map")}</span></div>
     <section class="guide-safety"><div>${icon("shield-check")}<span><strong>Aturan paling penting</strong><small>Jangan pernah membagikan kata sandi kepala sekolah. Undang anggota dari menu Tim Sekolah agar akses tetap aman dan dapat dihentikan kapan saja.</small></span></div><button class="btn btn-secondary" data-route-to="/team">Atur akses tim</button></section>
@@ -917,6 +1068,7 @@ function renderMore() {
     ["sparkles","Fitur AI","KSP, PBD, RKJM, RKT, RKAS, kegiatan, SOP, dan kinerja.","/ai"],
     ["database","Profil & Memori","Data utama dan dokumen sumber sekolah.","/profile"],
     ["users","Tim Sekolah","Akses penuh untuk orang yang membantu.","/team"],
+    ["clipboard-check","Supervisi Akademik","Data guru, instrumen, penilaian, tindak lanjut, dan hasil.","/supervision"],
     ["folder","Pustaka Format","Folder template asli di Google Drive.","/templates"],
     ["circle-help","Panduan Kerja","Petunjuk lengkap dalam satu halaman.","/guide"],
   ];
@@ -1165,7 +1317,7 @@ async function route(options = {}) {
     navigate("/onboarding");
     return;
   }
-  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, team: renderTeam, templates: renderTemplates, guide: renderGuide, more: renderMore, join: renderJoin, "document-editor": renderDocumentEditor })[routeName]?.();
+  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, supervision: renderSupervision, team: renderTeam, templates: renderTemplates, guide: renderGuide, more: renderMore, join: renderJoin, "document-editor": renderDocumentEditor })[routeName]?.();
   bindPageEvents();
   refreshIcons(app);
   if (!options.preserveScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1237,6 +1389,16 @@ function bindPageEvents() {
     app.querySelectorAll("[data-library-search]").forEach((card) => { card.hidden = query && !card.dataset.librarySearch.includes(query); });
   });
   app.querySelector("[data-invite-logout]")?.addEventListener("click",logoutForInvite);
+  app.querySelectorAll("[data-add-teacher]").forEach((button) => button.addEventListener("click",openTeacherDialog));
+  app.querySelectorAll("[data-new-supervision]").forEach((button) => button.addEventListener("click",() => openNewSupervisionDialog(button.dataset.newSupervision || "")));
+  app.querySelectorAll("[data-open-supervision]").forEach((button) => button.addEventListener("click",() => navigate(`/supervision?id=${encodeURIComponent(button.dataset.openSupervision)}`)));
+  const currentSupervision = currentRoute() === "supervision" ? currentSupervisions().find((entry) => entry.id === new URLSearchParams(window.location.search).get("id")) : null;
+  if (currentSupervision) {
+    app.querySelectorAll("#supervision-assessment input[type=radio], #supervision-assessment textarea").forEach((field) => field.addEventListener("input",() => updateSupervisionScore(currentSupervision)));
+    app.querySelectorAll("[data-save-supervision]").forEach((button) => button.addEventListener("click",() => saveSupervision(currentSupervision,false)));
+    app.querySelector("[data-complete-supervision]")?.addEventListener("click",() => saveSupervision(currentSupervision,true));
+    app.querySelectorAll("[data-export-supervision]").forEach((button) => button.addEventListener("click",() => exportSupervision(currentSupervision,button.dataset.exportSupervision)));
+  }
 }
 
 async function logoutForInvite() {
@@ -1704,7 +1866,7 @@ async function loadWorkspace() {
   if (!state.school) return;
   const calendarStart = new Date(state.calendarYear,0,1).toISOString();
   const calendarEnd = new Date(state.calendarYear+1,0,1).toISOString();
-  const [docs,sources,projects,agendas,assistant,members,invites,folders] = await Promise.all([
+  const [docs,sources,projects,agendas,assistant,members,invites,folders,teachers,supervisions] = await Promise.all([
     state.supabase.from("kepsek_documents").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_sources").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}),
     state.supabase.from("kepsek_projects").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
@@ -1713,12 +1875,15 @@ async function loadWorkspace() {
     state.supabase.from("kepsek_workspace_members").select("*").eq("school_id",state.school.id).order("joined_at",{ascending:true}),
     state.supabase.from("kepsek_workspace_invites").select("id,school_id,email,display_name,expires_at,accepted_at,created_at").eq("school_id",state.school.id).order("created_at",{ascending:false}),
     state.supabase.from("kepsek_template_folders").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
+    state.supabase.from("kepsek_teachers").select("*").eq("school_id",state.school.id).eq("status","active").order("full_name",{ascending:true}),
+    state.supabase.from("kepsek_supervisions").select("*").eq("school_id",state.school.id).order("scheduled_at",{ascending:false}),
   ]);
   state.documents = docs.data || []; state.sources = sources.data || []; state.projects = projects.data || []; state.agendas = agendas.data || [];
   state.assistantMessages = (assistant.data || []).reverse();
   state.teamMembers = (members.data || []).filter((member) => member.user_id !== state.school.owner_user_id);
   state.workspaceInvites = (invites.data || []).map((invite) => ({ ...invite, invite_url:localStorage.getItem(`bb-invite-${invite.id}`) || "" }));
   state.templateFolders = folders.data || [];
+  state.teachers = teachers.data || []; state.supervisions = supervisions.data || [];
 }
 
 function lastSessionActivity() {
@@ -1743,6 +1908,7 @@ function clearWorkspaceState() {
   state.documents = []; state.sources = []; state.projects = []; state.agendas = [];
   state.assistantMessages = []; state.teamMembers = []; state.workspaceInvites = [];
   state.templateFolders = []; state.pendingInviteToken = ""; state.selectedDocument = null;
+  state.teachers = []; state.supervisions = [];
 }
 
 async function expireIdleSession() {

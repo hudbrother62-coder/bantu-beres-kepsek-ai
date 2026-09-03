@@ -15,6 +15,7 @@
     { "source": "/documents/:path*", "destination": "/" },
     { "source": "/ai", "destination": "/" },
     { "source": "/assistant", "destination": "/" },
+    { "source": "/supervision", "destination": "/" },
     { "source": "/team", "destination": "/" },
     { "source": "/templates", "destination": "/" },
     { "source": "/guide", "destination": "/" },
