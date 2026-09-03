@@ -9,6 +9,7 @@ import { selectRelevantSources, validateGeneratedDocument } from "../api/generat
 import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "../assets/document-format.js";
 import { standardsFor, STANDARDS_VERIFIED_AT } from "../lib/education-standards.js";
 import { isIdleSession, SESSION_IDLE_MS } from "../assets/session-policy.js";
+import { containsVisibleAiMarkup, renderAiText } from "../assets/ai-text-format.js";
 
 function responseMock() {
   return {
@@ -168,4 +169,22 @@ test("session remains active for two hours and expires after inactivity", () => 
   assert.equal(isIdleSession(now - SESSION_IDLE_MS,now,true),false);
   assert.equal(isIdleSession(now - SESSION_IDLE_MS - 1,now,true),true);
   assert.equal(isIdleSession(now - SESSION_IDLE_MS - 1,now,false),false);
+});
+
+test("assistant formatter removes raw AI markers and renders readable structure", () => {
+  const raw = '* 1. "**10 Menit Siap Belajar**"\n* **Bentuk:** Pembiasaan kelas\n\n### Langkah\n- Rapikan meja\n- Siapkan buku';
+  const rendered = renderAiText(raw);
+  assert.match(rendered, /<ol>/);
+  assert.match(rendered, /<strong>10 Menit Siap Belajar<\/strong>/);
+  assert.match(rendered, /<h3>Langkah<\/h3>/);
+  assert.match(rendered, /<ul>/);
+  assert.equal(/\*\*|###|>\*/.test(rendered), false);
+  assert.equal(containsVisibleAiMarkup(raw), true);
+});
+
+test("assistant formatter escapes model HTML and keeps arithmetic stars", () => {
+  const rendered = renderAiText("Nilai: 2 * 3 = 6\n\n<script>alert(1)</script>");
+  assert.match(rendered, /2 \* 3 = 6/);
+  assert.doesNotMatch(rendered, /<script>/);
+  assert.match(rendered, /&lt;script&gt;/);
 });

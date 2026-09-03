@@ -646,6 +646,19 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
 .assistant-message-meta strong { font-size: .68rem; }
 .assistant-message-meta small { color: var(--muted); font-size: .6rem; }
 .assistant-message-text { font-size: .88rem; line-height: 1.72; overflow-wrap: anywhere; }
+.assistant-message-text p { margin: 0 0 10px; }
+.assistant-message-text p:last-child { margin-bottom: 0; }
+.assistant-message-text ul,.assistant-message-text ol { margin: 8px 0 12px; padding-left: 23px; }
+.assistant-message-text li { margin: 5px 0; padding-left: 3px; }
+.assistant-message-text li::marker { color: var(--purple); font-weight: 750; }
+.assistant-message-text blockquote { margin: 10px 0; padding: 9px 12px; border-left: 3px solid var(--purple); border-radius: 0 10px 10px 0; color: var(--ink-2); background: rgba(111,39,143,.06); }
+.assistant-message-text code { padding: 2px 5px; border-radius: 5px; color: var(--ink); background: rgba(18,90,169,.09); font: .82em ui-monospace,SFMono-Regular,Consolas,monospace; }
+.assistant-link-text { color: var(--blue); overflow-wrap: anywhere; }
+.assistant-table-wrap { max-width: 100%; margin: 10px 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.assistant-table-wrap table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.assistant-table-wrap th,.assistant-table-wrap td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.assistant-table-wrap th { color: var(--ink); background: rgba(18,90,169,.07); }
+.assistant-table-wrap tr:last-child td { border-bottom: 0; }
 .assistant-message-text h2,.assistant-message-text h3,.assistant-message-text h4 { margin: 13px 0 4px; line-height: 1.35; }
 .assistant-message-text h2 { font-size: 1rem; }
 .assistant-message-text h3 { font-size: .9rem; }

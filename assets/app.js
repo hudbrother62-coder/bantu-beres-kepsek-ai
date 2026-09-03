@@ -1,4 +1,5 @@
 import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "/assets/document-format.js";
+import { renderAiText } from "/assets/ai-text-format.js";
 import { isIdleSession, SESSION_IDLE_MS } from "/assets/session-policy.js";
 
 const app = document.querySelector("#app");
@@ -956,13 +957,7 @@ function statusLabel(status) {
 }
 
 function renderAssistantText(value = "") {
-  return escapeHtml(value)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^###\s+(.+)$/gm, "<h4>$1</h4>")
-    .replace(/^##\s+(.+)$/gm, "<h3>$1</h3>")
-    .replace(/^#\s+(.+)$/gm, "<h2>$1</h2>")
-    .replace(/^[-•]\s+(.+)$/gm, "<span class=\"assistant-list-item\">$1</span>")
-    .replace(/\n/g, "<br>");
+  return renderAiText(value);
 }
 
 function assistantMessage(message) {

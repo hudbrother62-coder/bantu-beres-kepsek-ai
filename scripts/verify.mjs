@@ -9,6 +9,7 @@ const required = [
   "assets/styles.css",
   "assets/app.js",
   "assets/document-format.js",
+  "assets/ai-text-format.js",
   "assets/session-policy.js",
   "assets/bantu-beres-symbol.png",
   "manifest.webmanifest",
