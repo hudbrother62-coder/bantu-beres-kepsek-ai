@@ -1,5 +1,6 @@
 const app = document.querySelector("#app");
 const toastRegion = document.querySelector("#toast-region");
+const APP_NAME = "Bantu Beres – Asisten AI Kepala Sekolah";
 
 const state = {
   config: null,
@@ -12,6 +13,9 @@ const state = {
   sources: [],
   agendas: [],
   projects: [],
+  teamMembers: [],
+  workspaceInvites: [],
+  templateFolders: [],
   assistantMessages: [],
   assistantSending: false,
   assistantDraft: "",
@@ -26,6 +30,8 @@ const state = {
   calendarMonth: new Date().getMonth(),
   selectedAgendaDate: "",
   configUpdatedAt: 0,
+  pendingInviteToken: new URLSearchParams(window.location.search).get("token") || new URLSearchParams(window.location.search).get("invite") || "",
+  inviteError: "",
   theme: localStorage.getItem("bb-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
 };
 
@@ -78,6 +84,29 @@ const demoAgendas = [
   { id: "agenda-supervisi", title: "Tindak lanjut supervisi", description: "Membahas hasil observasi dan rencana pendampingan.", starts_at: demoAgendaDate(1,9), ends_at: demoAgendaDate(1,10), status: "scheduled", priority: "high", metadata: { category:"Supervisi", location:"Ruang kepala sekolah", rundown:"09.00 Refleksi\n09.25 Rencana perbaikan\n09.45 Kesepakatan tindak lanjut" } },
 ];
 
+const driveLibrary = [
+  { id:"sop", name:"SOP Sekolah", count:116, icon:"list-checks", description:"Kumpulan SOP berbagai layanan dan bidang sekolah.", url:"https://drive.google.com/drive/folders/1NoGEOkaB-jgtR5ZOCvi3BHcR5YE-TN0j" },
+  { id:"supervisi", name:"Instrumen Supervisi", count:4, icon:"clipboard-check", description:"Instrumen penelaahan ATP, modul ajar, administrasi, dan pelaksanaan pembelajaran.", url:"https://drive.google.com/drive/folders/1bwXV5zWnLO7R9fI8D7Z7z21KCTUQ89Tu" },
+  { id:"ksp", name:"KSP / KOSP SD", count:42, icon:"book-open-check", description:"Format, contoh, dan lampiran kurikulum satuan pendidikan.", url:"https://drive.google.com/drive/folders/10EVhLR86p-eDCGGn42nrD7hsmvRWrneA" },
+  { id:"program", name:"Program Kerja Kepala Sekolah", count:6, icon:"folder-kanban", description:"Format program kerja untuk pengelolaan kegiatan kepala sekolah.", url:"https://drive.google.com/drive/folders/1HuiEnCv6MZGTQq1Dr7ICCMNopJMtaAAM" },
+  { id:"perencanaan", name:"EDS, RKS, RKJM, RKT & RKAS", count:26, icon:"route", description:"Pustaka format perencanaan dan penganggaran sekolah.", url:"https://drive.google.com/drive/folders/1er4FWVqJoe3BWmR-CQMeXlkyYr2tNde2" },
+  { id:"bonus-bukti", name:"Bonus Bukti Dukung", count:87, icon:"file-check-2", description:"Bukti dukung untuk kepala sekolah, wakasek, dan guru.", url:"https://drive.google.com/drive/folders/17joD1iDRY-jdiAS-yPl4RLG3YXK04sez" },
+  { id:"laporan", name:"Perencanaan & Laporan", count:10, icon:"file-text", description:"Format perencanaan dan laporan satuan pendidikan.", url:"https://drive.google.com/drive/folders/1p41ALqNOY3g9xUdHtWz-4VGNQWNyAf9l" },
+  { id:"pkks", name:"Penilaian Kinerja Kepala Sekolah", count:35, icon:"briefcase-business", description:"Format PKKS, pemetaan bukti, dan dokumen pendukung.", url:"https://drive.google.com/drive/folders/1BYeYq7CK7L3X280q7AFlGaj5enbP1Dsi" },
+  { id:"book", name:"Buku Panduan", count:7, icon:"book-open-check", description:"Buku acuan yang mendukung pekerjaan kepala sekolah.", url:"https://drive.google.com/drive/folders/1hYxso9HpO3AMulR6NxoYrQ_q1L40arNo" },
+  { id:"bukti", name:"Bukti Dukung Kepala Sekolah", count:87, icon:"files", description:"Arsip format bukti dukung kepala sekolah, wakasek, dan guru.", url:"https://drive.google.com/drive/folders/1VjPQw6I5HTRN-Fxdq19TDDoA2NT61LIq" },
+  { id:"kehadiran", name:"Rangkuman Kehadiran Guru", count:5, icon:"users", description:"Format rangkuman dan analisis kehadiran guru.", url:"https://drive.google.com/drive/folders/1zbuhmSUg97Ld1uRTGWdPg2Q2lyP4Lt-D" },
+];
+
+const demoTeamMembers = [
+  { id:"team-1", user_id:"demo-member-1", display_name:"Siti Rahmawati", email:"operator@harapbangsa.sch.id", joined_at:new Date().toISOString() },
+  { id:"team-2", user_id:"demo-member-2", display_name:"Andi Pratama", email:"wakasek@harapbangsa.sch.id", joined_at:new Date().toISOString() },
+];
+
+const demoTemplateFolders = [
+  { id:"folder-demo", name:"Format Khusus SDN Harapan Bangsa", category:"Folder sekolah", description:"Template internal yang tetap tersimpan di Google Drive sekolah.", drive_url:"https://drive.google.com/drive/folders/1EEoLPNgaLdnPdzJLvgxx_TVgvV7_E3DO" },
+];
+
 const assistantSuggestions = [
   "Apa tiga prioritas sekolah yang paling penting saat ini?",
   "Bantu saya menyiapkan poin rapat minggu ini.",
@@ -108,6 +137,8 @@ const iconPaths = {
   "circle-alert": '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
   "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m8 12 2.5 2.5L16 9"/>',
   "circle-help": '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4M12 18h.01"/>',
+  "clipboard-check": '<rect width="16" height="18" x="4" y="3" rx="2"/><path d="M9 3V1h6v2M8 12l2 2 5-5"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   "file-check-2": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 15l2 2 4-4"/>',
   "file-clock": '<path d="M14 2H6a2 2 0 0 0-2 2v7M14 2v6h6M16 13a5 5 0 1 0 5 5M16 15v3l2 1"/>',
@@ -115,6 +146,7 @@ const iconPaths = {
   "file-spreadsheet": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h8M11 13v4"/>',
   "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8M8 17h6"/>',
   files: '<path d="M15 2H6a2 2 0 0 0-2 2v13"/><rect width="14" height="16" x="6" y="6" rx="2"/><path d="M14 6v4h4"/>',
+  "external-link": '<path d="M15 3h6v6M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   folder: '<path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
   "folder-kanban": '<path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M8 11v5M12 11v3M16 11v6"/>',
   history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
@@ -122,6 +154,7 @@ const iconPaths = {
   "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
   "list-checks": '<path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17M10 6h11M10 12h11M10 18h11"/>',
   "lock-keyhole": '<rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3M12 14v4"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/>',
   "log-out": '<path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/>',
   map: '<path d="m3 6 5-3 8 3 5-3v15l-5 3-8-3-5 3Z"/><path d="M8 3v15M16 6v15"/>',
   mic: '<rect width="8" height="13" x="8" y="2" rx="4"/><path d="M4 10a8 8 0 0 0 16 0M12 18v4M8 22h8"/>',
@@ -136,6 +169,9 @@ const iconPaths = {
   "upload-cloud": '<path d="M12 13v8M8 17l4-4 4 4"/><path d="M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.5 4 4 0 0 0 5 18h2"/>',
   "user-check": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+  "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6"/>',
   "wallet-cards": '<rect width="20" height="14" x="2" y="6" rx="2"/><path d="M16 13h4M2 10h20M6 3h12"/>',
   workflow: '<rect width="7" height="5" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="16" rx="1"/><path d="M6.5 8v5a3 3 0 0 0 3 3H14M10 5h4a3 3 0 0 1 3 3v8"/>',
   "briefcase-business": '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20M10 12v2h4v-2"/>',
@@ -178,8 +214,8 @@ function toggleTheme() {
 
 function brand(compact = false) {
   return `<span class="brand${compact ? " compact" : ""}">
-    <span class="brand-symbol" aria-hidden="true"><img src="/assets/bantu-beres-logo.jpg" alt=""></span>
-    <span class="brand-copy"><span class="brand-name"><span>Bantu</span><span>Beres</span></span><span class="brand-product">Kepsek AI</span></span>
+    <span class="brand-symbol" aria-hidden="true"><img src="/assets/bantu-beres-symbol.png" alt=""></span>
+    <span class="brand-copy"><span class="brand-name"><span>Bantu</span><span>Beres</span></span><span class="brand-product">Asisten AI Kepala Sekolah</span></span>
   </span>`;
 }
 
@@ -223,6 +259,11 @@ function currentRoute() {
     "/documents": "documents",
     "/ai": "ai",
     "/assistant": "assistant",
+    "/team": "team",
+    "/templates": "templates",
+    "/guide": "guide",
+    "/more": "more",
+    "/join": "join",
   }[path] || "landing";
 }
 
@@ -231,10 +272,10 @@ function ambient() {
 }
 
 function renderLanding() {
-  document.title = "Bantu Beres KEPSEK AI — Asisten Kerja Kepala Sekolah";
+  document.title = `${APP_NAME}.`;
   app.innerHTML = `${ambient()}<main id="main-content" class="public-page">
     <nav class="public-nav glass" aria-label="Navigasi utama">
-      <a href="/" data-route aria-label="Bantu Beres KEPSEK AI">${brand()}</a>
+      <a href="/" data-route aria-label="${APP_NAME}">${brand()}</a>
       <div class="public-links"><a href="#cara-kerja">Cara kerja</a><a href="#fitur">Fitur</a><a href="#keamanan">Keamanan</a></div>
       <div class="public-actions">${themeToggle(false)}<button class="btn btn-secondary" data-route-to="/auth">Masuk</button><button class="btn btn-primary" data-route-to="/auth">Coba sekarang</button></div>
     </nav>
@@ -249,7 +290,7 @@ function renderLanding() {
       <div class="product-scene" aria-label="Gambaran antarmuka Bantu Beres">
         <div class="scene-glow"></div>
         <div class="product-window">
-          <div class="mini-top"><div class="mini-brand"><span class="brand-symbol"><img src="/assets/bantu-beres-logo.jpg" alt=""></span>Bantu Beres</div><div class="window-dots"><span></span><span></span><span></span></div></div>
+          <div class="mini-top"><div class="mini-brand"><span class="brand-symbol"><img src="/assets/bantu-beres-symbol.png" alt=""></span>Bantu Beres</div><div class="window-dots"><span></span><span></span><span></span></div></div>
           <div class="mini-hero"><small>Selamat pagi, Pak Budi</small><strong>Apa yang ingin dibereskan hari ini?</strong></div>
           <div class="mini-command">${icon("sparkles")} Buat RKT dari prioritas Rapor Pendidikan…</div>
           <div class="mini-grid">
@@ -267,7 +308,7 @@ function renderLanding() {
       <div class="feature"><span class="feature-icon">${icon("workflow")}</span><div><strong>Dokumen saling terhubung</strong><small>PBD, RKJM, RKT, dan RKAS tetap konsisten.</small></div></div>
       <div class="feature"><span class="feature-icon">${icon("user-check")}</span><div><strong>Kepala sekolah menyetujui</strong><small>AI membantu; keputusan tetap di tangan Anda.</small></div></div>
     </section>
-    <section class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Masalah yang dibereskan</div><h2>Administrasi sekolah tidak seharusnya menghabiskan waktu memimpin.</h2><p>KEPSEK AI mengurangi pengulangan, membantu menjaga konsistensi, dan membuat pekerjaan penting lebih mudah ditemukan.</p></div><div class="problem-grid">
+    <section class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Masalah yang dibereskan</div><h2>Administrasi sekolah tidak seharusnya menghabiskan waktu memimpin.</h2><p>Bantu Beres mengurangi pengulangan, membantu menjaga konsistensi, dan membuat pekerjaan penting lebih mudah ditemukan.</p></div><div class="problem-grid">
       ${problemCard("01","Data diketik berulang","Nama sekolah, program, indikator, dan prioritas sering disalin kembali ke banyak dokumen.")}
       ${problemCard("02","Dokumen tidak terhubung","PBD, RKJM, RKT, RKAS, kegiatan, dan laporan dikerjakan di file yang terpisah.")}
       ${problemCard("03","Tenggat datang bersamaan","Dokumen kinerja, laporan, dan administrasi kegiatan menumpuk menjelang batas waktu.")}
@@ -286,9 +327,9 @@ function renderLanding() {
       ${moduleCard("briefcase-business","Kinerja Kepala Sekolah","Pemetaan aktivitas, bukti dukung, refleksi, dan tindak lanjut.")}
       ${moduleCard("files","Pusat Dokumen AI","Versi, status persetujuan, sumber, pencarian, dan ekspor dokumen.")}
     </div></section>
-    <section id="keamanan" class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Pertanyaan umum</div><h2>Jelas sebelum mulai.</h2></div><div class="faq-list"><details class="faq-item"><summary>Apakah hasil AI langsung menjadi dokumen final?</summary><p>Tidak. Semua hasil berstatus draft dan harus diperiksa serta disetujui kepala sekolah sebelum digunakan.</p></details><details class="faq-item"><summary>Apakah KEPSEK AI menggantikan ARKAS atau e-Kinerja?</summary><p>Tidak. KEPSEK AI membantu menyusun, memeriksa, dan mengelola draft. Penginputan serta pengesahan tetap dilakukan melalui sistem resmi.</p></details><details class="faq-item"><summary>Apakah data sekolah lain dapat terlihat?</summary><p>Tidak. Database menggunakan workspace dan Row Level Security untuk memisahkan akses setiap sekolah.</p></details><details class="faq-item"><summary>Format apa yang dapat diunggah dan diekspor?</summary><p>Dokumen dapat diunggah dalam format Word, Excel, PDF, CSV, teks, atau gambar. Hasil dapat diekspor ke Word, Excel, dan PDF.</p></details></div></section>
-    <section class="final-cta"><h2>Lebih sedikit mengulang administrasi. Lebih banyak waktu memimpin sekolah.</h2><p>Bangun Memori Sekolah dan mulai susun pekerjaan pertama bersama KEPSEK AI.</p><button class="btn btn-primary" data-route-to="/auth">Buat workspace sekolah ${icon("arrow-right")}</button></section>
-    <footer class="public-footer"><a href="/" data-route>${brand()}</a><span>© ${new Date().getFullYear()} Bantu Beres. KEPSEK AI adalah asisten penyusunan draft, bukan sistem resmi pemerintah.</span><div class="footer-links"><a href="#">Privasi</a><a href="#">Ketentuan</a><a href="#">Bantuan</a></div></footer>
+    <section id="keamanan" class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Pertanyaan umum</div><h2>Jelas sebelum mulai.</h2></div><div class="faq-list"><details class="faq-item"><summary>Apakah hasil AI langsung menjadi dokumen final?</summary><p>Tidak. Semua hasil berstatus draft dan harus diperiksa serta disetujui kepala sekolah sebelum digunakan.</p></details><details class="faq-item"><summary>Apakah Bantu Beres menggantikan ARKAS atau e-Kinerja?</summary><p>Tidak. Bantu Beres membantu menyusun, memeriksa, dan mengelola draft. Penginputan serta pengesahan tetap dilakukan melalui sistem resmi.</p></details><details class="faq-item"><summary>Apakah data sekolah lain dapat terlihat?</summary><p>Tidak. Database menggunakan workspace dan Row Level Security untuk memisahkan akses setiap sekolah.</p></details><details class="faq-item"><summary>Format apa yang dapat diunggah dan diekspor?</summary><p>Dokumen dapat diunggah dalam format Word, Excel, PDF, CSV, teks, atau gambar. Hasil dapat diekspor ke Word, Excel, dan PDF.</p></details></div></section>
+    <section class="final-cta"><h2>Lebih sedikit mengulang administrasi. Lebih banyak waktu memimpin sekolah.</h2><p>Bangun Memori Sekolah dan mulai susun pekerjaan pertama bersama Bantu Beres.</p><button class="btn btn-primary" data-route-to="/auth">Buat workspace sekolah ${icon("arrow-right")}</button></section>
+    <footer class="public-footer"><a href="/" data-route>${brand()}</a><span>© ${new Date().getFullYear()} Bantu Beres. Asisten AI membantu menyusun draft dan bukan sistem resmi pemerintah.</span><div class="footer-links"><a href="#">Privasi</a><a href="#">Ketentuan</a><a href="/guide" data-route>Panduan</a></div></footer>
   </main>`;
 }
 
@@ -296,7 +337,11 @@ function problemCard(number,title,text) { return `<article class="problem-card">
 function moduleCard(iconName,title,text) { return `<article class="module-card"><span class="feature-icon">${icon(iconName)}</span><h3>${title}</h3><p>${text}</p></article>`; }
 
 function renderAuth() {
-  document.title = "Masuk — Bantu Beres KEPSEK AI";
+  const params = new URLSearchParams(window.location.search);
+  const inviteToken = params.get("invite") || state.pendingInviteToken || "";
+  const signup = params.get("mode") === "signup";
+  if (inviteToken) state.pendingInviteToken = inviteToken;
+  document.title = `Masuk — ${APP_NAME}`;
   app.innerHTML = `${ambient()}<main id="main-content" class="auth-page">
     <section class="auth-story">
       <div class="auth-story-head"><a href="/" data-route>${brand()}</a>${themeToggle(false)}</div>
@@ -306,25 +351,26 @@ function renderAuth() {
     <section class="auth-panel">
       <div class="auth-box">
         ${state.authNotice ? `<div class="auth-confirmation"><span class="confirmation-icon">${icon("mail")}</span><h2>Periksa email Anda</h2><p>Tautan konfirmasi akun telah dikirim ke <strong>${escapeHtml(state.authNotice)}</strong>. Setelah dikonfirmasi, kembali ke halaman ini untuk masuk.</p><button class="btn btn-primary btn-block" data-back-login>Kembali ke halaman masuk</button></div>` : `
-          <h2>Selamat datang</h2><p>Masuk atau buat akun khusus kepala sekolah.</p>
+          <h2>${inviteToken ? "Gabung ke workspace sekolah" : "Selamat datang"}</h2><p>${inviteToken ? "Gunakan email yang menerima undangan. Akun Anda akan memperoleh akses kerja penuh." : "Masuk atau buat akun untuk mengelola workspace sekolah."}</p>
+          ${inviteToken ? `<div class="invite-auth-note">${icon("users")} Undangan tim sekolah terdeteksi</div>` : ""}
           ${state.demo ? '<div class="demo-notice">Mode pratinjau aktif. Anda dapat menjelajahi seluruh tampilan web; fitur AI belum diaktifkan.</div>' : ""}
-          <div class="auth-tabs"><button type="button" class="auth-tab active" data-auth-mode="login">Masuk</button><button type="button" class="auth-tab" data-auth-mode="signup">Buat akun</button></div>
-          <form id="auth-form" data-mode="login" novalidate>
-            <div id="name-field" class="form-group" hidden><label for="full-name">Nama lengkap kepala sekolah</label><input class="form-control" id="full-name" name="fullName" autocomplete="name" placeholder="Contoh: Budi Santoso, M.Pd."></div>
+          <div class="auth-tabs"><button type="button" class="auth-tab ${signup ? "" : "active"}" data-auth-mode="login">Masuk</button><button type="button" class="auth-tab ${signup ? "active" : ""}" data-auth-mode="signup">Buat akun</button></div>
+          <form id="auth-form" data-mode="${signup ? "signup" : "login"}" novalidate>
+            <div id="name-field" class="form-group" ${signup ? "" : "hidden"}><label for="full-name">Nama lengkap</label><input class="form-control" id="full-name" name="fullName" autocomplete="name" placeholder="Contoh: Siti Rahmawati" ${signup ? "required" : ""}></div>
             <div class="form-group"><label for="email">Email</label><input class="form-control" id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="kepsek@sekolah.sch.id" required></div>
-            <div class="form-group"><label for="password">Kata sandi</label><input class="form-control" id="password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Minimal 8 karakter" required></div>
-            <div id="confirm-field" class="form-group" hidden><label for="confirm-password">Ulangi kata sandi</label><input class="form-control" id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Ketik ulang kata sandi"></div>
+            <div class="form-group"><label for="password">Kata sandi</label><input class="form-control" id="password" name="password" type="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="8" placeholder="Minimal 8 karakter" required></div>
+            <div id="confirm-field" class="form-group" ${signup ? "" : "hidden"}><label for="confirm-password">Ulangi kata sandi</label><input class="form-control" id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Ketik ulang kata sandi" ${signup ? "required" : ""}></div>
             <div id="auth-error" class="form-error" role="alert" hidden></div>
-            <button class="btn btn-primary btn-block" type="submit"><span id="auth-submit-label">Masuk ke KEPSEK AI</span>${icon("arrow-right")}</button>
+            <button class="btn btn-primary btn-block" type="submit"><span id="auth-submit-label">${signup ? "Buat akun" : "Masuk ke workspace"}</span>${icon("arrow-right")}</button>
           </form>
-          <div class="auth-foot">Akun ini membuat satu ruang kerja privat untuk sekolah Anda. Data pengguna sekolah lain tidak dapat diakses.</div>`}
+          <div class="auth-foot">${inviteToken ? "Setiap anggota memakai akun sendiri; tidak perlu berbagi kata sandi kepala sekolah." : "Akun ini membuat satu ruang kerja privat untuk sekolah Anda. Data pengguna sekolah lain tidak dapat diakses."}</div>`}
       </div>
     </section>
   </main>`;
 }
 
 function renderOnboarding() {
-  document.title = "Siapkan Workspace Sekolah — Bantu Beres";
+  document.title = `Siapkan Workspace Sekolah — ${APP_NAME}`;
   app.innerHTML = `<main id="main-content" class="onboarding-page">
     <header class="onboarding-head">${brand()}<div class="onboarding-head-actions">${themeToggle(false)}<button class="btn btn-secondary">${icon("circle-help")} Butuh bantuan</button></div></header>
     <div class="onboarding-body">
@@ -361,9 +407,10 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <nav class="side-menu" aria-label="Menu aplikasi">
         <div class="menu-label">Ruang kerja</div>
         ${navLink("/dashboard","Beranda","layout-dashboard",active === "dashboard")}
-        ${navLink("/assistant","Asisten Kepsek","brain-circuit",active === "assistant")}
+        ${navLink("/assistant","Asisten AI","brain-circuit",active === "assistant")}
         ${navLink("/calendar","Agenda & Kalender","calendar-days",active === "calendar")}
         ${navLink("/profile","Profil & Memori","database",active === "profile")}
+        ${navLink("/team","Tim Sekolah","users",active === "team")}
         ${navLink("/ai?type=pbd","Mutu & PBD","chart-no-axes-combined",active === "pbd")}
         ${navLink("/ai?type=ksp","KSP & Kurikulum","book-open-check",active === "ksp")}
         ${navLink("/ai?type=rkt","Perencanaan","route",active === "planning")}
@@ -372,8 +419,11 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         ${navLink("/ai?type=activity","Program & Kegiatan","folder-kanban",active === "activity")}
         ${navLink("/ai?type=performance","Kinerja Kepala Sekolah","briefcase-business",active === "performance")}
         ${navLink("/documents","Pusat Dokumen","files",active === "documents")}
+        <div class="menu-label">Referensi & bantuan</div>
+        ${navLink("/templates","Pustaka Format","folder",active === "templates")}
+        ${navLink("/guide","Panduan Kerja","circle-help",active === "guide")}
       </nav>
-      <div class="sidebar-profile"><span class="user-avatar">${escapeHtml(initials(principal))}</span><div><strong>${escapeHtml(principal)}</strong><small>Kepala sekolah</small></div><button class="sidebar-logout" data-logout aria-label="Keluar">${icon("log-out")}</button></div>
+      <div class="sidebar-profile"><span class="user-avatar">${escapeHtml(initials(principal))}</span><div><strong>${escapeHtml(principal)}</strong><small>Akses penuh sekolah</small></div><button class="sidebar-logout" data-logout aria-label="Keluar">${icon("log-out")}</button></div>
     </aside>
     <div class="app-main">
       <header class="topbar">
@@ -386,8 +436,8 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         <a class="mobile-nav-item ${active === "dashboard" ? "active" : ""}" href="/dashboard" data-route>${icon("home")}Beranda</a>
         <a class="mobile-nav-item ${active === "assistant" ? "active" : ""}" href="/assistant" data-route>${icon("brain-circuit")}Asisten</a>
         <a class="mobile-nav-item ${active === "calendar" ? "active" : ""}" href="/calendar" data-route>${icon("calendar-days")}Agenda</a>
-        <a class="mobile-nav-item ${["ksp","pbd","planning","rkas","activity","performance"].includes(active) ? "active" : ""}" href="/ai" data-route>${icon("sparkles")}Fitur AI</a>
         <a class="mobile-nav-item ${active === "documents" ? "active" : ""}" href="/documents" data-route>${icon("folder")}Dokumen</a>
+        <a class="mobile-nav-item ${["more","team","templates","guide","profile","ksp","pbd","planning","rkas","activity","performance"].includes(active) ? "active" : ""}" href="/more" data-route>${icon("menu")}Menu</a>
       </nav>
     </div>
   </div>`;
@@ -404,10 +454,10 @@ function renderDashboard() {
   const timeline = todayAgendas.length ? todayAgendas.map((agenda) => agendaTimelineItem(agenda)).join("") : `<div class="agenda-empty compact"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada agenda hari ini</strong><small>Tambahkan kegiatan agar rundown harian tersusun.</small><button class="btn btn-secondary" data-add-agenda data-date="${todayKey}">${icon("plus")} Tambah agenda</button></div>`;
   const priorityRows = upcomingAgendas.length ? upcomingAgendas.map((agenda) => priorityAgendaItem(agenda)).join("") : `<button class="priority" data-add-agenda data-date="${todayKey}"><span class="priority-icon tone-blue">${icon("calendar-days")}</span><span><strong>Susun agenda pertama</strong><small>Tambahkan rapat, supervisi, atau kegiatan sekolah.</small></span><span class="priority-time">Tambah</span></button>`;
   const aiEnabled = Boolean(state.config?.aiConfigured);
-  document.title = "Beranda — Bantu Beres KEPSEK AI";
+  document.title = `Beranda — ${APP_NAME}`;
   const content = `<section class="command-hero">
     <div class="welcome-row"><div class="welcome"><small>Selamat datang, ${escapeHtml(principal)} 👋</small><h1>Siap membantu pekerjaan sekolah hari ini.</h1><p>Ada ${docs.filter((doc) => doc.status !== "approved").length || 3} dokumen yang masih perlu ditinjau.</p></div><div class="completion"><div class="completion-ring" style="--completion:${completion}%"><span>${completion}%</span></div><div><small>Kelengkapan workspace</small><strong>${completion >= 80 ? "Sudah baik" : "Hampir siap"}</strong></div></div></div>
-    <form class="ai-command ${aiEnabled ? "" : "ai-command-paused"}" id="quick-ai-form">${icon("sparkles")}<input name="prompt" aria-label="Pesan untuk Asisten Kepsek" placeholder="${aiEnabled ? "Tanya Asisten Kepsek tentang sekolah Anda…" : "AI belum aktif — periksa konfigurasi server"}" ${aiEnabled ? "" : "disabled"}><button aria-label="${aiEnabled ? "Kirim ke Asisten Kepsek" : "AI belum aktif"}" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "arrow-right" : "lock-keyhole")}</button></form>
+    <form class="ai-command ${aiEnabled ? "" : "ai-command-paused"}" id="quick-ai-form">${icon("sparkles")}<input name="prompt" aria-label="Pesan untuk Asisten AI" placeholder="${aiEnabled ? "Tanya Asisten AI tentang sekolah Anda…" : "AI belum aktif — periksa konfigurasi server"}" ${aiEnabled ? "" : "disabled"}><button aria-label="${aiEnabled ? "Kirim ke Asisten AI" : "AI belum aktif"}" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "arrow-right" : "lock-keyhole")}</button></form>
   </section>
   <div class="dashboard-columns">
     <div>
@@ -497,7 +547,7 @@ function renderCalendar() {
   }
   const rundownRows = selectedAgendas.length ? selectedAgendas.map(agendaRundownCard).join("") : `<div class="agenda-empty"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada kegiatan</strong><small>Jadwal pada tanggal ini masih kosong.</small><button class="btn btn-primary" data-add-agenda data-date="${state.selectedAgendaDate}">${icon("plus")} Tambah kegiatan</button></div>`;
   const selectedLabel = new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(selected);
-  document.title = "Agenda & Kalender — Bantu Beres";
+  document.title = `Agenda & Kalender — ${APP_NAME}`;
   const content = `<div class="page-intro calendar-intro"><div><h1>Agenda & Kalender Sekolah</h1><p>Susun kegiatan kepala sekolah sepanjang tahun dan lihat rundown setiap hari.</p></div><button class="btn btn-primary" data-add-agenda data-date="${state.selectedAgendaDate}">${icon("plus")} Tambah agenda</button></div>
     <section class="calendar-toolbar panel"><div class="year-switch"><button class="icon-btn" data-calendar-year="${state.calendarYear-1}" aria-label="Tahun sebelumnya">${icon("arrow-left")}</button><div><small>Tahun agenda</small><strong>${state.calendarYear}</strong></div><button class="icon-btn" data-calendar-year="${state.calendarYear+1}" aria-label="Tahun berikutnya">${icon("arrow-right")}</button></div><div class="calendar-summary"><span><strong>${yearAgendas.length}</strong><small>Agenda tahun ini</small></span><span><strong>${monthAgendas.length}</strong><small>Bulan terpilih</small></span><button class="btn btn-secondary" data-calendar-today>Ke hari ini</button></div></section>
     <section class="year-overview"><div class="section-heading-inline"><div><h2>Kalender ${state.calendarYear}</h2><p>Pilih bulan untuk melihat tanggal dan kegiatannya.</p></div></div><div class="year-month-grid">${monthCards}</div></section>
@@ -515,7 +565,7 @@ function agendaRundownCard(agenda) {
   const endTime = end ? new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit",hour12:false}).format(end) : "Selesai";
   const metadata = agenda.metadata || {};
   const rundown = String(metadata.rundown || agenda.description || "Belum ada rincian rundown.").split(/\n+/).filter(Boolean);
-  return `<article class="rundown-card ${agenda.priority === "high" ? "important" : ""}"><div class="rundown-time"><strong>${escapeHtml(time)}</strong><small>${escapeHtml(endTime)}</small></div><div class="rundown-body"><div class="rundown-title"><div><span class="agenda-category">${escapeHtml(metadata.category || "Kegiatan")}</span><h3>${escapeHtml(agenda.title)}</h3></div><button class="edit-agenda" data-edit-agenda="${escapeHtml(agenda.id)}">Edit</button></div>${metadata.location ? `<p class="agenda-location">${escapeHtml(metadata.location)}</p>` : ""}<ol>${rundown.slice(0,5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></div></article>`;
+  return `<article class="rundown-card ${agenda.priority === "high" ? "important" : ""}"><div class="rundown-time"><strong>${escapeHtml(time)}</strong><small>${escapeHtml(endTime)}</small></div><div class="rundown-body"><div class="rundown-title"><div><span class="agenda-category">${escapeHtml(metadata.category || "Kegiatan")}</span><h3>${escapeHtml(agenda.title)}</h3></div><button class="edit-agenda" data-edit-agenda="${escapeHtml(agenda.id)}">Edit</button></div>${metadata.location ? `<p class="agenda-location">${escapeHtml(metadata.location)}</p>` : ""}${metadata.assignedTo ? `<p class="agenda-assignee">${icon("user-check")} Penanggung jawab: ${escapeHtml(metadata.assignedTo)}</p>` : ""}<ol>${rundown.slice(0,5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></div></article>`;
 }
 
 function openAgendaDialog(agendaId = "", requestedDate = "") {
@@ -524,7 +574,8 @@ function openAgendaDialog(agendaId = "", requestedDate = "") {
   const end = agenda?.ends_at ? new Date(agenda.ends_at) : new Date(start.getTime()+60*60*1000);
   const metadata = agenda?.metadata || {};
   const timeValue = (date) => `${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
-  const modal = `<div class="dialog-backdrop" id="agenda-dialog"><section class="dialog agenda-dialog" role="dialog" aria-modal="true" aria-labelledby="agenda-dialog-title"><div class="dialog-head"><div><h2 id="agenda-dialog-title">${agenda ? "Edit agenda" : "Tambah agenda"}</h2><p>${agenda ? "Perbarui jadwal dan rundown kegiatan." : "Isi yang penting dulu; detail lain boleh menyusul."}</p></div><button class="btn btn-ghost compact-button" type="button" data-dialog-close>Batal</button></div><form id="agenda-form" data-agenda-id="${escapeHtml(agenda?.id || "")}"><div class="field-grid agenda-form-grid"><div class="form-group field-span"><label for="agenda-title">Nama kegiatan</label><input class="form-control" id="agenda-title" name="title" value="${escapeHtml(agenda?.title || "")}" placeholder="Contoh: Rapat evaluasi program" minlength="3" required></div><div class="form-group"><label for="agenda-date">Tanggal</label><input class="form-control" id="agenda-date" name="date" type="date" value="${localDateKey(start)}" required></div><div class="form-group"><label for="agenda-category">Jenis kegiatan</label><select class="form-control" id="agenda-category" name="category">${["Rapat","Supervisi","Kurikulum","Perencanaan","Kinerja","Kegiatan","Lainnya"].map((item) => `<option ${metadata.category === item ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="form-group"><label for="agenda-start">Mulai</label><input class="form-control" id="agenda-start" name="startTime" type="time" value="${timeValue(start)}" required></div><div class="form-group"><label for="agenda-end">Selesai</label><input class="form-control" id="agenda-end" name="endTime" type="time" value="${timeValue(end)}"></div><div class="form-group field-span"><label for="agenda-location">Tempat <small>(opsional)</small></label><input class="form-control" id="agenda-location" name="location" value="${escapeHtml(metadata.location || "")}" placeholder="Contoh: Ruang rapat"></div><div class="form-group field-span"><label for="agenda-description">Catatan singkat <small>(opsional)</small></label><textarea class="form-control" id="agenda-description" name="description" placeholder="Tujuan atau hal penting yang perlu diingat">${escapeHtml(agenda?.description || "")}</textarea></div><div class="form-group field-span"><label for="agenda-rundown">Rundown detail <small>(satu baris untuk setiap urutan)</small></label><textarea class="form-control rundown-input" id="agenda-rundown" name="rundown" placeholder="08.00 Pembukaan\n08.15 Pembahasan utama\n09.00 Tindak lanjut">${escapeHtml(metadata.rundown || "")}</textarea></div><div class="form-group"><label for="agenda-priority">Prioritas</label><select class="form-control" id="agenda-priority" name="priority"><option value="normal" ${agenda?.priority !== "high" ? "selected" : ""}>Biasa</option><option value="high" ${agenda?.priority === "high" ? "selected" : ""}>Penting</option><option value="low" ${agenda?.priority === "low" ? "selected" : ""}>Rendah</option></select></div><div class="form-group"><label for="agenda-status">Status</label><select class="form-control" id="agenda-status" name="status"><option value="scheduled" ${agenda?.status !== "completed" ? "selected" : ""}>Terjadwal</option><option value="completed" ${agenda?.status === "completed" ? "selected" : ""}>Selesai</option><option value="cancelled" ${agenda?.status === "cancelled" ? "selected" : ""}>Dibatalkan</option></select></div></div><div id="agenda-error" class="form-error" role="alert" hidden></div><div class="dialog-actions">${agenda ? '<button class="btn btn-danger" type="button" data-delete-agenda>Hapus</button>' : '<span></span>'}<button class="btn btn-primary" type="submit">${icon("save")} Simpan agenda</button></div></form></section></div>`;
+  const assigneeOptions = [`<option value="">Belum ditentukan</option>`,...teamAccessRows().map((member) => { const name = member.display_name || member.email; return `<option value="${escapeHtml(name)}" ${metadata.assignedTo === name ? "selected" : ""}>${escapeHtml(name)}</option>`; })].join("");
+  const modal = `<div class="dialog-backdrop" id="agenda-dialog"><section class="dialog agenda-dialog" role="dialog" aria-modal="true" aria-labelledby="agenda-dialog-title"><div class="dialog-head"><div><h2 id="agenda-dialog-title">${agenda ? "Edit agenda" : "Tambah agenda"}</h2><p>${agenda ? "Perbarui jadwal dan rundown kegiatan." : "Isi yang penting dulu; detail lain boleh menyusul."}</p></div><button class="btn btn-ghost compact-button" type="button" data-dialog-close>Batal</button></div><form id="agenda-form" data-agenda-id="${escapeHtml(agenda?.id || "")}"><div class="field-grid agenda-form-grid"><div class="form-group field-span"><label for="agenda-title">Nama kegiatan</label><input class="form-control" id="agenda-title" name="title" value="${escapeHtml(agenda?.title || "")}" placeholder="Contoh: Rapat evaluasi program" minlength="3" required></div><div class="form-group"><label for="agenda-date">Tanggal</label><input class="form-control" id="agenda-date" name="date" type="date" value="${localDateKey(start)}" required></div><div class="form-group"><label for="agenda-category">Jenis kegiatan</label><select class="form-control" id="agenda-category" name="category">${["Rapat","Supervisi","Kurikulum","Perencanaan","Kinerja","Kegiatan","Lainnya"].map((item) => `<option ${metadata.category === item ? "selected" : ""}>${item}</option>`).join("")}</select></div><div class="form-group"><label for="agenda-start">Mulai</label><input class="form-control" id="agenda-start" name="startTime" type="time" value="${timeValue(start)}" required></div><div class="form-group"><label for="agenda-end">Selesai</label><input class="form-control" id="agenda-end" name="endTime" type="time" value="${timeValue(end)}"></div><div class="form-group field-span"><label for="agenda-location">Tempat <small>(opsional)</small></label><input class="form-control" id="agenda-location" name="location" value="${escapeHtml(metadata.location || "")}" placeholder="Contoh: Ruang rapat"></div><div class="form-group field-span"><label for="agenda-description">Catatan singkat <small>(opsional)</small></label><textarea class="form-control" id="agenda-description" name="description" placeholder="Tujuan atau hal penting yang perlu diingat">${escapeHtml(agenda?.description || "")}</textarea></div><div class="form-group field-span"><label for="agenda-rundown">Rundown detail <small>(satu baris untuk setiap urutan)</small></label><textarea class="form-control rundown-input" id="agenda-rundown" name="rundown" placeholder="08.00 Pembukaan\n08.15 Pembahasan utama\n09.00 Tindak lanjut">${escapeHtml(metadata.rundown || "")}</textarea></div><div class="form-group"><label for="agenda-assignee">Penanggung jawab <small>(opsional)</small></label><select class="form-control" id="agenda-assignee" name="assignedTo">${assigneeOptions}</select></div><div class="form-group"><label for="agenda-priority">Prioritas</label><select class="form-control" id="agenda-priority" name="priority"><option value="normal" ${agenda?.priority !== "high" ? "selected" : ""}>Biasa</option><option value="high" ${agenda?.priority === "high" ? "selected" : ""}>Penting</option><option value="low" ${agenda?.priority === "low" ? "selected" : ""}>Rendah</option></select></div><div class="form-group"><label for="agenda-status">Status</label><select class="form-control" id="agenda-status" name="status"><option value="scheduled" ${agenda?.status !== "completed" ? "selected" : ""}>Terjadwal</option><option value="completed" ${agenda?.status === "completed" ? "selected" : ""}>Selesai</option><option value="cancelled" ${agenda?.status === "cancelled" ? "selected" : ""}>Dibatalkan</option></select></div></div><div id="agenda-error" class="form-error" role="alert" hidden></div><div class="dialog-actions">${agenda ? '<button class="btn btn-danger" type="button" data-delete-agenda>Hapus</button>' : '<span></span>'}<button class="btn btn-primary" type="submit">${icon("save")} Simpan agenda</button></div></form></section></div>`;
   app.insertAdjacentHTML("beforeend",modal);
   document.body.classList.add("dialog-open");
   bindAgendaDialog();
@@ -557,7 +608,7 @@ async function handleAgendaSubmit(event) {
     const endsAt = values.endTime ? new Date(`${values.date}T${values.endTime}:00`) : null;
     if (endsAt && endsAt < startsAt) throw new Error("Waktu selesai tidak boleh lebih awal dari waktu mulai.");
     const existing = currentAgendas().find((item) => item.id === form.dataset.agendaId);
-    const payload = { title:values.title.trim(), description:values.description?.trim() || null, starts_at:startsAt.toISOString(), ends_at:endsAt?.toISOString() || null, status:values.status, priority:values.priority, metadata:{ ...(existing?.metadata || {}), category:values.category, location:values.location?.trim() || "", rundown:values.rundown?.trim() || "" } };
+    const payload = { title:values.title.trim(), description:values.description?.trim() || null, starts_at:startsAt.toISOString(), ends_at:endsAt?.toISOString() || null, status:values.status, priority:values.priority, metadata:{ ...(existing?.metadata || {}), category:values.category, location:values.location?.trim() || "", rundown:values.rundown?.trim() || "", assignedTo:values.assignedTo || "" } };
     let saved;
     if (state.demo || !state.supabase) {
       saved = existing ? { ...existing,...payload,updated_at:new Date().toISOString() } : { id:crypto.randomUUID(),school_id:state.school?.id,created_by:state.user?.id,...payload,created_at:new Date().toISOString(),updated_at:new Date().toISOString() };
@@ -612,7 +663,7 @@ function renderProfile() {
   const school = state.school || demoSchool;
   const profile = school.profile_data || {};
   const sources = state.sources.length ? state.sources : demoSources;
-  document.title = "Profil & Memori Sekolah — Bantu Beres";
+  document.title = `Profil & Memori Sekolah — ${APP_NAME}`;
   const sourceRows = sources.map((source) => `<div class="source-row"><span class="source-icon">${icon(source.mime_type?.includes("spreadsheet") || source.name?.match(/xlsx|xls|csv/i) ? "file-spreadsheet" : source.mime_type?.includes("pdf") ? "file-text" : "files")}</span><span><strong>${escapeHtml(source.name)}</strong><small>${escapeHtml(source.summary || "Tersimpan di Memori Sekolah")}</small></span><span class="badge ${source.status === "ready" ? "badge-green" : "badge-neutral"}">${source.status === "ready" ? "Siap" : "Tersimpan"}</span></div>`).join("");
   const content = `<div class="page-intro"><div><h1>Profil & Memori Sekolah</h1><p>Sumber data utama yang digunakan untuk menyusun seluruh perencanaan dan dokumen sekolah.</p></div><button class="btn btn-primary" form="profile-form">${icon("save")} Simpan perubahan</button></div>
     <div class="split-layout">
@@ -634,13 +685,251 @@ function profileField(label, name, value, readonly = false, type = "text") {
   return `<div class="form-group"><label for="${name}">${label}</label><input class="form-control" id="${name}" name="${name}" type="${type}" value="${escapeHtml(value)}" ${readonly ? 'readonly aria-readonly="true"' : ""}></div>`;
 }
 
+function isWorkspaceOwner() {
+  return Boolean(state.membership?.isOwner || (state.school?.owner_user_id && state.school.owner_user_id === state.user?.id) || state.demo);
+}
+
+function teamAccessRows() {
+  const school = state.school || demoSchool;
+  const owner = {
+    id: "workspace-owner",
+    user_id: school.owner_user_id || state.user?.id || "demo-owner",
+    display_name: school.principal_name || "Kepala Sekolah",
+    email: isWorkspaceOwner() ? state.user?.email || "kepala.sekolah@sekolah.sch.id" : "Pengelola awal workspace",
+    owner: true,
+  };
+  return [owner, ...(state.teamMembers || [])];
+}
+
+function renderTeam() {
+  const members = teamAccessRows();
+  const owner = isWorkspaceOwner();
+  const invites = state.workspaceInvites || [];
+  document.title = `Tim Sekolah — ${APP_NAME}`;
+  const memberRows = members.map((member) => `<article class="access-row">
+    <span class="access-avatar">${escapeHtml(initials(member.display_name || member.email))}</span>
+    <span class="access-person"><strong>${escapeHtml(member.display_name || "Anggota sekolah")}</strong><small>${escapeHtml(member.email || "Email anggota")}</small></span>
+    <span class="badge ${member.owner ? "badge-purple" : "badge-green"}">${member.owner ? "Pengelola akses" : "Akses penuh"}</span>
+    ${owner && !member.owner ? `<button type="button" class="icon-btn danger-icon" data-remove-member="${escapeHtml(member.user_id)}" aria-label="Hapus akses ${escapeHtml(member.display_name || member.email)}" title="Hapus akses">${icon("trash")}</button>` : ""}
+  </article>`).join("");
+  const inviteRows = invites.filter((invite) => !invite.accepted_at && new Date(invite.expires_at) > new Date()).map((invite) => `<article class="invite-row">
+    <span class="invite-icon">${icon("mail")}</span><span><strong>${escapeHtml(invite.email)}</strong><small>Berlaku sampai ${formatDate(invite.expires_at)}</small></span>
+    ${invite.invite_url ? `<button type="button" class="btn btn-secondary compact-button" data-copy-invite="${escapeHtml(invite.invite_url)}">${icon("copy")} Salin tautan</button>` : `<span class="invite-link-note" title="Demi keamanan, tautan mentah hanya disimpan pada perangkat yang membuatnya.">Tautan tidak tersimpan di perangkat ini</span>`}
+    <button type="button" class="icon-btn danger-icon" data-cancel-invite="${escapeHtml(invite.id)}" aria-label="Batalkan undangan">${icon("trash")}</button>
+  </article>`).join("");
+  const content = `<div class="page-intro"><div><span class="page-kicker">Satu sekolah, satu ruang kerja</span><h1>Tim Sekolah</h1><p>Bagikan pekerjaan kepada operator, wakasek, atau tim supervisi tanpa membagikan kata sandi kepala sekolah.</p></div>${owner ? `<button class="btn btn-primary" type="button" data-open-invite>${icon("user-plus")} Tambah anggota</button>` : ""}</div>
+    <section class="access-explainer">
+      <span class="access-explainer-icon">${icon("shield-check")}</span><div><strong>Akses kerja sama, akun tetap berbeda</strong><p>Semua anggota dapat memakai fitur dan data sekolah yang sama. Setiap orang masuk dengan emailnya sendiri, sehingga akses dapat dihentikan tanpa mengganti kata sandi seluruh tim.</p></div>
+    </section>
+    <div class="team-layout"><section class="panel"><div class="panel-head"><div><h2>Orang yang dapat masuk</h2><p>${members.length} akun terhubung ke workspace ini</p></div></div><div class="access-list">${memberRows}</div></section>
+    <aside class="team-aside"><section class="panel"><div class="panel-head"><div><h2>Pembagian kerja sederhana</h2><p>Semua anggota memiliki akses kerja yang sama</p></div></div><div class="delegation-list"><span><b>1</b><span><strong>Undang orang yang dipercaya</strong><small>Gunakan email mereka sendiri.</small></span></span><span><b>2</b><span><strong>Bagi tugas lewat agenda</strong><small>Pilih penanggung jawab pada agenda kegiatan.</small></span></span><span><b>3</b><span><strong>Tinjau hasil bersama</strong><small>Dokumen dan memori sekolah tetap satu.</small></span></span></div></section>
+    ${owner ? `<section class="panel"><div class="panel-head"><div><h2>Undangan aktif</h2><p>Bagikan lewat WhatsApp atau email</p></div></div>${inviteRows ? `<div class="invite-list">${inviteRows}</div>` : `<div class="small-empty">${icon("mail")}<span><strong>Belum ada undangan</strong><small>Buat tautan untuk anggota yang akan membantu.</small></span></div>`}</section>` : ""}</aside></div>`;
+  app.innerHTML = appShell(content, "team", "Tim Sekolah");
+}
+
+function openInviteDialog() {
+  const modal = `<div class="dialog-backdrop" id="invite-dialog"><section class="dialog small-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-dialog-title"><div class="dialog-head"><div><h2 id="invite-dialog-title">Tambahkan anggota sekolah</h2><p>Anggota memakai email sendiri dan mendapat akses kerja penuh.</p></div><button class="btn btn-ghost compact-button" type="button" data-dialog-close>Batal</button></div><form id="invite-form"><div class="form-group"><label for="invite-name">Nama anggota</label><input class="form-control" id="invite-name" name="displayName" placeholder="Contoh: Siti Rahmawati" minlength="2" required></div><div class="form-group"><label for="invite-email">Email anggota</label><input class="form-control" id="invite-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="anggota@sekolah.sch.id" required></div><div class="safe-note">${icon("circle-alert")} Jangan masukkan kata sandi kepala sekolah. Sistem akan membuat tautan masuk khusus untuk email ini.</div><div id="invite-error" class="form-error" role="alert" hidden></div><div class="dialog-actions"><span></span><button class="btn btn-primary" type="submit">${icon("link")} Buat tautan undangan</button></div></form></section></div>`;
+  document.body.insertAdjacentHTML("beforeend",modal);
+  const dialog = document.querySelector("#invite-dialog");
+  dialog.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click",() => dialog.remove()));
+  dialog.addEventListener("click",(event) => { if (event.target === dialog) dialog.remove(); });
+  dialog.querySelector("#invite-form").addEventListener("submit",handleInviteCreate);
+  dialog.querySelector("#invite-name")?.focus();
+}
+
+async function handleInviteCreate(event) {
+  event.preventDefault();
+  const submit = event.currentTarget.querySelector("button[type=submit]");
+  const errorBox = event.currentTarget.querySelector("#invite-error");
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  submit.disabled = true; errorBox.hidden = true;
+  try {
+    const email = String(values.email || "").trim().toLowerCase();
+    if (email === String(state.user?.email || "").toLowerCase()) throw new Error("Email ini sudah menjadi pengelola workspace.");
+    const token = secureToken();
+    const tokenHash = await sha256(token);
+    const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+    const inviteUrl = `${window.location.origin}/join?token=${encodeURIComponent(token)}`;
+    let invite = { id:crypto.randomUUID(), school_id:state.school.id, email, display_name:String(values.displayName || "").trim(), token_hash:tokenHash, expires_at:expiresAt, invited_by:state.user.id, invite_url:inviteUrl };
+    if (!state.demo && state.supabase) {
+      const { data,error } = await state.supabase.from("kepsek_workspace_invites").insert({ school_id:state.school.id, email:invite.email, display_name:invite.display_name, token_hash:invite.token_hash, expires_at:invite.expires_at, invited_by:state.user.id }).select().single();
+      if (error) throw error;
+      invite = { ...data, invite_url:inviteUrl };
+    }
+    try { localStorage.setItem(`bb-invite-${invite.id}`,inviteUrl); } catch { /* Private browsing may block storage. */ }
+    state.workspaceInvites.unshift(invite);
+    document.querySelector("#invite-dialog")?.remove();
+    renderTeam(); bindPageEvents();
+    try {
+      await copyText(inviteUrl);
+      toast("Tautan undangan dibuat dan disalin");
+    } catch {
+      toast("Undangan berhasil dibuat. Gunakan tombol Salin tautan.","error");
+    }
+  } catch (cause) {
+    errorBox.textContent = humanError(cause); errorBox.hidden = false;
+  } finally { submit.disabled = false; }
+}
+
+async function removeTeamMember(userId) {
+  const member = state.teamMembers.find((item) => item.user_id === userId);
+  if (!member || !window.confirm(`Hentikan akses ${member.display_name || member.email}?`)) return;
+  try {
+    if (!state.demo && state.supabase) {
+      const { error } = await state.supabase.from("kepsek_workspace_members").delete().eq("school_id",state.school.id).eq("user_id",userId);
+      if (error) throw error;
+    }
+    state.teamMembers = state.teamMembers.filter((item) => item.user_id !== userId);
+    renderTeam(); bindPageEvents(); toast("Akses anggota dihentikan");
+  } catch (cause) { toast(humanError(cause),"error"); }
+}
+
+async function cancelWorkspaceInvite(id) {
+  try {
+    if (!state.demo && state.supabase) {
+      const { error } = await state.supabase.from("kepsek_workspace_invites").delete().eq("id",id).eq("school_id",state.school.id);
+      if (error) throw error;
+    }
+    localStorage.removeItem(`bb-invite-${id}`);
+    state.workspaceInvites = state.workspaceInvites.filter((item) => item.id !== id);
+    renderTeam(); bindPageEvents(); toast("Undangan dibatalkan");
+  } catch (cause) { toast(humanError(cause),"error"); }
+}
+
+function secureToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
+}
+
+async function sha256(value) {
+  const digest = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2,"0")).join("");
+}
+
+async function copyText(value) {
+  if (!value) throw new Error("Tautan undangan tidak tersedia. Buat undangan baru.");
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
+  const input = document.createElement("textarea");
+  input.value = value;
+  input.setAttribute("readonly","");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  document.body.append(input);
+  input.select();
+  if (!document.execCommand("copy")) throw new Error("Tautan belum dapat disalin. Salin langsung dari bilah alamat.");
+  input.remove();
+}
+
+function renderTemplates() {
+  const ownFolders = state.templateFolders || [];
+  document.title = `Pustaka Format — ${APP_NAME}`;
+  const libraryCards = driveLibrary.map((folder) => driveFolderCard(folder,true)).join("");
+  const ownCards = ownFolders.map((folder) => driveFolderCard({ ...folder, url:folder.drive_url, icon:"folder", count:null },false)).join("");
+  const content = `<div class="page-intro"><div><span class="page-kicker">Tautan asli Google Drive</span><h1>Pustaka Format</h1><p>Gunakan format yang sudah tersedia langsung dari sumbernya. File tidak disalin atau dibuat ulang oleh aplikasi.</p></div><button class="btn btn-primary" type="button" data-open-folder>${icon("plus")} Tambah folder Drive</button></div>
+    <section class="library-notice">${icon("external-link")}<span><strong>Semua kartu membuka folder asli</strong><small>Hak akses file tetap mengikuti pengaturan Google Drive pemilik folder.</small></span><a href="https://drive.google.com/drive/folders/1EEoLPNgaLdnPdzJLvgxx_TVgvV7_E3DO" target="_blank" rel="noopener noreferrer">Buka folder utama ${icon("arrow-up-right")}</a></section>
+    <div class="library-toolbar"><label class="library-search">${icon("search")}<input id="library-search" placeholder="Cari SOP, supervisi, RKJM…" aria-label="Cari pustaka format"></label><span>${driveLibrary.length + ownFolders.length} folder tersedia</span></div>
+    <section class="library-section"><div class="section-inline-head"><div><h2>Pustaka Bantu Beres</h2><p>Referensi dari folder Drive yang Anda berikan.</p></div></div><div class="drive-grid" id="drive-library-grid">${libraryCards}</div></section>
+    <section class="library-section"><div class="section-inline-head"><div><h2>Folder sekolah saya</h2><p>Simpan tautan template internal tanpa memindahkan filenya.</p></div></div>${ownCards ? `<div class="drive-grid" id="own-library-grid">${ownCards}</div>` : `<div class="panel empty-library">${icon("folder")}<div><h3>Belum ada folder sekolah</h3><p>Tambahkan tautan Google Drive agar seluruh tim membuka format yang sama.</p></div><button class="btn btn-secondary" data-open-folder>Tambah folder</button></div>`}</section>`;
+  app.innerHTML = appShell(content,"templates","Pustaka Format");
+}
+
+function driveFolderCard(folder, builtIn) {
+  return `<article class="drive-card" data-library-search="${escapeHtml(`${folder.name} ${folder.description || ""} ${folder.category || ""}`.toLowerCase())}"><span class="drive-icon">${icon(folder.icon || "folder")}</span><span class="drive-card-copy"><small>${builtIn ? "Pustaka utama" : escapeHtml(folder.category || "Folder sekolah")}</small><h3>${escapeHtml(folder.name)}</h3><p>${escapeHtml(folder.description || "Folder format sekolah di Google Drive.")}</p></span><div class="drive-card-foot">${folder.count == null ? `<span>Google Drive</span>` : `<span>${folder.count} file</span>`}<a href="${escapeHtml(folder.url)}" target="_blank" rel="noopener noreferrer">Buka folder ${icon("external-link")}</a>${builtIn ? "" : `<button class="icon-btn danger-icon" type="button" data-remove-folder="${escapeHtml(folder.id)}" aria-label="Hapus tautan folder">${icon("trash")}</button>`}</div></article>`;
+}
+
+function openFolderDialog() {
+  const modal = `<div class="dialog-backdrop" id="folder-dialog"><section class="dialog small-dialog" role="dialog" aria-modal="true" aria-labelledby="folder-dialog-title"><div class="dialog-head"><div><h2 id="folder-dialog-title">Tambah folder Google Drive</h2><p>Aplikasi hanya menyimpan tautannya; file tetap di Drive.</p></div><button class="btn btn-ghost compact-button" type="button" data-dialog-close>Batal</button></div><form id="folder-form"><div class="form-group"><label for="folder-name">Nama folder</label><input class="form-control" id="folder-name" name="name" placeholder="Contoh: Format Supervisi Internal" minlength="3" required></div><div class="form-group"><label for="folder-category">Kategori</label><input class="form-control" id="folder-category" name="category" placeholder="Contoh: Supervisi"></div><div class="form-group"><label for="folder-url">Tautan Google Drive</label><input class="form-control" id="folder-url" name="driveUrl" type="url" inputmode="url" placeholder="https://drive.google.com/drive/folders/…" required></div><div class="form-group"><label for="folder-description">Keterangan <small>(opsional)</small></label><textarea class="form-control" id="folder-description" name="description" placeholder="Isi atau kegunaan folder"></textarea></div><div id="folder-error" class="form-error" role="alert" hidden></div><div class="dialog-actions"><span></span><button class="btn btn-primary" type="submit">${icon("save")} Simpan tautan</button></div></form></section></div>`;
+  document.body.insertAdjacentHTML("beforeend",modal);
+  const dialog = document.querySelector("#folder-dialog");
+  dialog.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click",() => dialog.remove()));
+  dialog.addEventListener("click",(event) => { if (event.target === dialog) dialog.remove(); });
+  dialog.querySelector("#folder-form").addEventListener("submit",handleFolderCreate);
+  dialog.querySelector("#folder-name")?.focus();
+}
+
+async function handleFolderCreate(event) {
+  event.preventDefault();
+  const submit = event.currentTarget.querySelector("button[type=submit]");
+  const errorBox = event.currentTarget.querySelector("#folder-error");
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  submit.disabled = true; errorBox.hidden = true;
+  try {
+    const driveUrl = String(values.driveUrl || "").trim();
+    const parsed = new URL(driveUrl);
+    if (!/(^|\.)drive\.google\.com$/.test(parsed.hostname) && !/(^|\.)docs\.google\.com$/.test(parsed.hostname)) throw new Error("Masukkan tautan folder Google Drive yang benar.");
+    let folder = { id:crypto.randomUUID(), school_id:state.school.id, name:String(values.name).trim(), category:String(values.category || "Folder sekolah").trim() || "Folder sekolah", description:String(values.description || "").trim(), drive_url:driveUrl, created_by:state.user.id };
+    if (!state.demo && state.supabase) {
+      const { data,error } = await state.supabase.from("kepsek_template_folders").insert({ school_id:state.school.id, name:folder.name, category:folder.category, description:folder.description, drive_url:folder.drive_url, created_by:state.user.id }).select().single();
+      if (error) throw error;
+      folder = data;
+    }
+    state.templateFolders.unshift(folder);
+    document.querySelector("#folder-dialog")?.remove();
+    renderTemplates(); bindPageEvents(); toast("Folder Drive berhasil ditambahkan");
+  } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; }
+  finally { submit.disabled = false; }
+}
+
+async function removeTemplateFolder(id) {
+  if (!window.confirm("Hapus tautan folder dari pustaka? File di Google Drive tidak akan terhapus.")) return;
+  try {
+    if (!state.demo && state.supabase) {
+      const { error } = await state.supabase.from("kepsek_template_folders").delete().eq("id",id).eq("school_id",state.school.id);
+      if (error) throw error;
+    }
+    state.templateFolders = state.templateFolders.filter((folder) => folder.id !== id);
+    renderTemplates(); bindPageEvents(); toast("Tautan folder dihapus");
+  } catch (cause) { toast(humanError(cause),"error"); }
+}
+
+function renderGuide() {
+  document.title = `Panduan Kerja — ${APP_NAME}`;
+  const steps = [
+    ["1","Siapkan profil sekolah","Isi identitas, visi, misi, jumlah warga sekolah, dan prioritas utama.","/profile","Buka Profil & Memori"],
+    ["2","Hubungkan tim tepercaya","Undang operator, wakasek, atau tim supervisi memakai email mereka sendiri.","/team","Atur Tim Sekolah"],
+    ["3","Simpan sumber dan format","Unggah data sekolah ke Memori dan tautkan folder format asli di Google Drive.","/templates","Buka Pustaka Format"],
+    ["4","Susun agenda kerja","Masukkan kegiatan setahun, rundown harian, tempat, lalu pilih penanggung jawab.","/calendar","Atur Agenda"],
+    ["5","Buat dan tinjau dokumen","Pilih jenis dokumen, jelaskan kebutuhan, lalu periksa asumsi dan bagian yang kosong.","/ai","Mulai menyusun"],
+    ["6","Setujui dan ekspor","Edit hasil bersama tim, ubah status menjadi disetujui, lalu unduh Word, Excel, atau PDF.","/documents","Buka Pusat Dokumen"],
+  ];
+  const content = `<div class="guide-hero"><div><span class="page-kicker">Panduan satu halaman</span><h1>Dari persiapan sampai dokumen selesai</h1><p>Ikuti urutan ini saat pertama kali menggunakan aplikasi. Setelah itu, pekerjaan harian cukup dimulai dari Beranda atau Agenda.</p></div><span class="guide-hero-icon">${icon("map")}</span></div>
+    <section class="guide-safety"><div>${icon("shield-check")}<span><strong>Aturan paling penting</strong><small>Jangan pernah membagikan kata sandi kepala sekolah. Undang anggota dari menu Tim Sekolah agar akses tetap aman dan dapat dihentikan kapan saja.</small></span></div><button class="btn btn-secondary" data-route-to="/team">Atur akses tim</button></section>
+    <section class="guide-flow">${steps.map(([number,title,text,path,action]) => `<article class="guide-step"><span>${number}</span><div><h2>${title}</h2><p>${text}</p><button class="guide-link" data-route-to="${path}">${action} ${icon("arrow-right")}</button></div></article>`).join("")}</section>
+    <section class="panel guide-routine"><div class="panel-head"><div><h2>Pola kerja mingguan yang ringan</h2><p>Agar kepala sekolah tidak mengerjakan semuanya sendiri</p></div></div><div class="routine-grid"><div><strong>Senin</strong><small>Tetapkan agenda dan penanggung jawab.</small></div><div><strong>Selasa–Kamis</strong><small>Tim mengisi data, dokumen, dan bukti kegiatan.</small></div><div><strong>Jumat</strong><small>Kepala sekolah meninjau hasil dan tindak lanjut.</small></div><div><strong>Akhir bulan</strong><small>Ekspor dokumen penting dan rapikan pustaka.</small></div></div></section>
+    <section class="guide-help"><span>${icon("circle-help")}</span><div><h2>Kalau bingung, mulai dari Asisten</h2><p>Tanyakan pekerjaan apa yang perlu diprioritaskan berdasarkan Memori Sekolah dan agenda yang tersimpan.</p></div><button class="btn btn-primary" data-route-to="/assistant">Buka Asisten AI</button></section>`;
+  app.innerHTML = appShell(content,"guide","Panduan Kerja");
+}
+
+function renderMore() {
+  const items = [
+    ["sparkles","Fitur AI","KSP, PBD, RKJM, RKT, RKAS, kegiatan, SOP, dan kinerja.","/ai"],
+    ["database","Profil & Memori","Data utama dan dokumen sumber sekolah.","/profile"],
+    ["users","Tim Sekolah","Akses penuh untuk orang yang membantu.","/team"],
+    ["folder","Pustaka Format","Folder template asli di Google Drive.","/templates"],
+    ["circle-help","Panduan Kerja","Petunjuk lengkap dalam satu halaman.","/guide"],
+  ];
+  document.title = `Menu — ${APP_NAME}`;
+  const content = `<div class="page-intro compact-intro"><div><h1>Semua Menu</h1><p>Pilih pekerjaan yang ingin dibuka.</p></div></div><div class="more-grid">${items.map(([iconName,title,text,path]) => `<button class="more-card" data-route-to="${path}"><span>${icon(iconName)}</span><div><strong>${title}</strong><small>${text}</small></div>${icon("arrow-right")}</button>`).join("")}</div>`;
+  app.innerHTML = appShell(content,"more","Semua Menu");
+}
+
+function renderJoin() {
+  const token = new URLSearchParams(window.location.search).get("token") || state.pendingInviteToken;
+  state.pendingInviteToken = token || "";
+  document.title = `Gabung Workspace — ${APP_NAME}`;
+  const target = `/auth?invite=${encodeURIComponent(token || "")}`;
+  const signedInError = state.user && state.inviteError ? `<div class="form-error invite-claim-error">${escapeHtml(state.inviteError)}</div><button class="btn btn-primary btn-block" type="button" data-invite-logout>Keluar dan gunakan email penerima</button>` : "";
+  app.innerHTML = `${ambient()}<main id="main-content" class="join-page"><section class="join-card">${brand()}<span class="join-icon">${icon(token ? "users" : "circle-alert")}</span><h1>${token ? "Anda diundang membantu sekolah" : "Tautan undangan tidak lengkap"}</h1><p>${token ? "Masuk atau buat akun dengan email yang menerima undangan. Setelah itu Anda akan memakai workspace sekolah yang sama dengan akses kerja penuh." : "Minta pengelola workspace membuat dan mengirim ulang tautan dari menu Tim Sekolah."}</p>${signedInError || (token ? `<div class="join-promise">${icon("shield-check")} Kata sandi Anda tetap pribadi dan tidak dibagikan kepada anggota lain.</div><div class="join-actions"><button class="btn btn-primary" data-route-to="${target}&mode=login">Masuk dan bergabung</button><button class="btn btn-secondary" data-route-to="${target}&mode=signup">Buat akun baru</button></div>` : `<button class="btn btn-secondary" data-route-to="/auth">Ke halaman masuk</button>`)}</section></main>`;
+}
+
 function renderDocuments() {
   const docs = state.documents.length ? state.documents : demoDocuments;
-  document.title = "Pusat Dokumen — Bantu Beres";
+  document.title = `Pusat Dokumen — ${APP_NAME}`;
   const cards = docs.map((doc) => `<article class="document-card" data-document-id="${escapeHtml(doc.id)}" tabindex="0" role="button"><div class="document-card-top"><span class="document-icon">${icon(documentIcon(doc.type))}</span><span class="badge ${statusClass(doc.status)}">${statusLabel(doc.status)}</span></div><h3>${escapeHtml(doc.title)}</h3><p>${escapeHtml(aiTypes[doc.type]?.label || "Dokumen sekolah")}</p><div class="document-meta"><span>Versi ${doc.version || 1}</span><span>${formatDate(doc.updated_at || new Date())}</span></div></article>`).join("");
   const content = `<div class="page-intro"><div><h1>Pusat Dokumen</h1><p>Semua draft, dokumen yang sedang ditinjau, dan arsip sekolah tersimpan dengan riwayat versinya.</p></div><button class="btn btn-primary" data-new-document>${icon("plus")} Buat dokumen</button></div>
     <div class="stats-grid"><div class="stat"><span class="stat-icon">${icon("files")}</span><div><small>Semua dokumen</small><strong>${docs.length}</strong></div></div><div class="stat"><span class="stat-icon">${icon("file-clock")}</span><div><small>Perlu ditinjau</small><strong>${docs.filter((doc) => doc.status === "review").length}</strong></div></div><div class="stat"><span class="stat-icon">${icon("file-check-2")}</span><div><small>Sudah disetujui</small><strong>${docs.filter((doc) => doc.status === "approved").length}</strong></div></div></div>
-    ${cards ? `<div class="document-grid">${cards}</div>` : `<div class="panel empty-state"><span class="empty-icon">${icon("files")}</span><h3>Belum ada dokumen</h3><p>Buat dokumen pertama dengan bantuan KEPSEK AI.</p><button class="btn btn-primary" data-new-document>Mulai membuat</button></div>`}`;
+    ${cards ? `<div class="document-grid">${cards}</div>` : `<div class="panel empty-state"><span class="empty-icon">${icon("files")}</span><h3>Belum ada dokumen</h3><p>Buat dokumen pertama dengan bantuan Asisten AI.</p><button class="btn btn-primary" data-new-document>Mulai membuat</button></div>`}`;
   app.innerHTML = appShell(content, "documents", "Pusat Dokumen");
 }
 
@@ -668,7 +957,7 @@ function renderAssistantText(value = "") {
 
 function assistantMessage(message) {
   const role = message.role === "assistant" ? "assistant" : "user";
-  const label = role === "assistant" ? "Asisten Kepsek" : "Anda";
+  const label = role === "assistant" ? "Asisten AI" : "Anda";
   return `<article class="assistant-message ${role} ${message.failed ? "failed" : ""}">
     <span class="assistant-avatar">${role === "assistant" ? icon("brain-circuit") : escapeHtml(initials((state.school || demoSchool).principal_name))}</span>
     <div class="assistant-bubble"><div class="assistant-message-meta"><strong>${label}</strong><small>${message.created_at ? new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit"}).format(new Date(message.created_at)) : "sekarang"}</small></div><div class="assistant-message-text">${renderAssistantText(message.content)}</div>${message.failed ? `<button class="assistant-retry" data-retry-assistant="${escapeHtml(message.id)}">${icon("history")} Coba kirim lagi</button>` : ""}</div>
@@ -680,22 +969,22 @@ function renderAssistant() {
   const aiEnabled = Boolean(state.config?.aiConfigured);
   const messages = state.assistantMessages || [];
   const memoryCount = 1 + state.sources.length;
-  document.title = "Asisten Kepsek — Bantu Beres KEPSEK AI";
+  document.title = `Asisten AI — ${APP_NAME}`;
   const empty = `<div class="assistant-empty">
     <span class="assistant-hero-icon">${icon("brain-circuit")}</span>
     <div><span class="assistant-kicker">Asisten pribadi kepala sekolah</span><h1>Apa yang ingin dibahas hari ini?</h1><p>Saya dapat diajak berpikir, menyiapkan keputusan, membahas pekerjaan sekolah, atau sekadar menjadi teman berdiskusi.</p></div>
     <div class="assistant-suggestions">${assistantSuggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}">${icon("sparkles")}<span>${escapeHtml(suggestion)}</span></button>`).join("")}</div>
   </div>`;
   const content = `<section class="assistant-shell">
-    <header class="assistant-head"><div><div class="eyebrow"><span class="eyebrow-dot"></span>Terhubung ke Memori Sekolah</div><h1>Asisten Kepsek</h1><p>Jawaban disesuaikan dengan ${escapeHtml(school.name)}.</p></div>${messages.length ? `<button class="btn btn-secondary assistant-clear" type="button" data-clear-assistant>${icon("history")} Percakapan baru</button>` : ""}</header>
+    <header class="assistant-head"><div><div class="eyebrow"><span class="eyebrow-dot"></span>Terhubung ke Memori Sekolah</div><h1>Asisten AI</h1><p>Jawaban disesuaikan dengan ${escapeHtml(school.name)}.</p></div>${messages.length ? `<button class="btn btn-secondary assistant-clear" type="button" data-clear-assistant>${icon("history")} Percakapan baru</button>` : ""}</header>
     <div class="assistant-memory"><span class="assistant-memory-icon">${icon("shield-check")}</span><span><strong>${memoryCount} sumber memori siap digunakan</strong><small>Profil dan dokumen sekolah hanya digunakan di workspace ini.</small></span><a href="/profile" data-route>Lihat memori ${icon("arrow-right")}</a></div>
     <div class="assistant-conversation" id="assistant-conversation" aria-live="polite">
       ${messages.length ? messages.map(assistantMessage).join("") : empty}
       ${state.assistantSending ? `<article class="assistant-message assistant"><span class="assistant-avatar">${icon("brain-circuit")}</span><div class="assistant-bubble assistant-typing"><span></span><span></span><span></span><small>Asisten sedang berpikir…</small></div></article>` : ""}
     </div>
-    ${aiEnabled ? `<form class="assistant-composer" id="assistant-form"><textarea name="message" id="assistant-input" rows="1" maxlength="6000" placeholder="Tulis pesan untuk Asisten Kepsek…" aria-label="Pesan untuk Asisten Kepsek" ${state.assistantSending ? "disabled" : ""}>${escapeHtml(state.assistantDraft || "")}</textarea><div class="assistant-compose-foot"><small>Enter untuk kirim • Shift+Enter untuk baris baru</small><button class="btn btn-primary" type="submit" ${state.assistantSending ? "disabled" : ""}>${icon("arrow-up-right")} <span>Kirim</span></button></div></form>` : `<div class="assistant-offline">${icon("circle-alert")}<span><strong>AI belum terhubung</strong><small>Periksa Environment Variables Gemini di Vercel, kemudian redeploy.</small></span></div>`}
+    ${aiEnabled ? `<form class="assistant-composer" id="assistant-form"><textarea name="message" id="assistant-input" rows="1" maxlength="6000" placeholder="Tulis pesan untuk Asisten AI…" aria-label="Pesan untuk Asisten AI" ${state.assistantSending ? "disabled" : ""}>${escapeHtml(state.assistantDraft || "")}</textarea><div class="assistant-compose-foot"><small>Enter untuk kirim • Shift+Enter untuk baris baru</small><button class="btn btn-primary" type="submit" ${state.assistantSending ? "disabled" : ""}>${icon("arrow-up-right")} <span>Kirim</span></button></div></form>` : `<div class="assistant-offline">${icon("circle-alert")}<span><strong>AI belum terhubung</strong><small>Periksa Environment Variables Gemini di Vercel, kemudian redeploy.</small></span></div>`}
   </section>`;
-  app.innerHTML = appShell(content, "assistant", "Asisten Kepsek");
+  app.innerHTML = appShell(content, "assistant", "Asisten AI");
   requestAnimationFrame(() => {
     const conversation = app.querySelector("#assistant-conversation");
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
@@ -710,13 +999,13 @@ function renderAi() {
   const type = aiTypes[state.aiType] || aiTypes.ksp;
   const aiEnabled = Boolean(state.config?.aiConfigured);
   const sources = state.sources.length ? state.sources : demoSources;
-  document.title = `${type.label} — Bantu Beres KEPSEK AI`;
+  document.title = `${type.label} — ${APP_NAME}`;
   const sourceChips = sources.slice(0,4).map((source) => `<span class="source-chip">${icon("file-check-2")}${escapeHtml(source.name)}</span>`).join("");
   const content = `<div class="page-intro compact-intro"><div><h1>${escapeHtml(type.label)}</h1><p>${escapeHtml(type.description)}</p></div></div>
     <div class="ai-simple-shell">
       <div class="ai-steps" aria-label="Tahapan pembuatan dokumen"><span class="active"><b>1</b>Pilih dokumen</span><span><b>2</b>Jelaskan kebutuhan</span><span><b>3</b>Tinjau hasil</span></div>
       <section class="ai-compose ai-compose-simple">
-        <div class="compose-head"><div class="eyebrow"><span class="eyebrow-dot"></span>${aiEnabled ? "KEPSEK AI siap membantu" : "Pratinjau fitur AI"}</div><h1>${escapeHtml(type.title)}</h1><p>Cukup pilih dokumen dan jelaskan kebutuhan. Profil serta data sekolah akan dipakai otomatis.</p></div>
+        <div class="compose-head"><div class="eyebrow"><span class="eyebrow-dot"></span>${aiEnabled ? "Asisten AI siap membantu" : "Pratinjau fitur AI"}</div><h1>${escapeHtml(type.title)}</h1><p>Cukup pilih dokumen dan jelaskan kebutuhan. Profil serta data sekolah akan dipakai otomatis.</p></div>
         ${aiEnabled ? "" : `<div class="ai-paused-banner">${icon("shield-check")}<span><strong>AI belum diaktifkan</strong><small>Formulir sudah siap digunakan. Setelah API AI diaktifkan, tombol susun draft akan otomatis tersedia.</small></span></div>`}
         <form id="ai-form">
           <div class="compose-body simple-compose-body">
@@ -727,7 +1016,7 @@ function renderAi() {
           </div>
           <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Siap menyusun dan memeriksa draft" : "AI belum aktif"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun draft" : "Segera tersedia"}</button></div>
         </form>
-        <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun draft…</h2><p>KEPSEK AI membaca profil, sumber sekolah, dan memeriksa konsistensi hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca Profil Sekolah</div><div class="processing-item"><span>✓</span>Menghubungkan sumber relevan</div><div class="processing-item"><span>•</span>Menyusun dan memeriksa draft</div></div></div>
+        <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun draft…</h2><p>Asisten AI membaca profil, sumber sekolah, dan memeriksa konsistensi hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca Profil Sekolah</div><div class="processing-item"><span>✓</span>Menghubungkan sumber relevan</div><div class="processing-item"><span>•</span>Menyusun dan memeriksa draft</div></div></div>
         <div class="generation-done" id="generation-done"><span class="done-icon">${icon("file-check-2")}</span><h2>Draft berhasil disusun</h2><p>Dokumen masih berstatus draft dan perlu ditinjau kepala sekolah sebelum digunakan.</p><div class="result-preview"><strong id="result-title">${escapeHtml(type.label)}</strong><small id="result-summary">Draft siap ditinjau dan diedit.</small></div><div id="result-details" class="result-details"></div><div class="result-actions"><button class="btn btn-secondary" id="generate-again">Buat ulang</button><button class="btn btn-primary" id="open-result">Tinjau dan edit ${icon("arrow-right")}</button></div></div>
       </section>
     </div>`;
@@ -758,7 +1047,7 @@ function renderDocumentEditor() {
   const doc = docs.find((item) => item.id === id) || state.selectedDocument;
   if (!doc) { navigate("/documents"); return; }
   state.selectedDocument = doc;
-  document.title = `${doc.title} — Bantu Beres`;
+  document.title = `${doc.title} — ${APP_NAME}`;
   const contentMeta = typeof doc.content === "object" && doc.content ? doc.content : {};
   const reviewItems = [
     ...(contentMeta.missingFields || []).map((item) => ({ tone: "warning", label: "Perlu dilengkapi", text: item })),
@@ -804,7 +1093,14 @@ function schoolContext(school) {
 
 async function route(options = {}) {
   const routeName = currentRoute();
-  const protectedRoute = !["landing", "auth"].includes(routeName);
+  const protectedRoute = !["landing", "auth", "join"].includes(routeName);
+  const inviteToken = new URLSearchParams(window.location.search).get("token") || new URLSearchParams(window.location.search).get("invite") || state.pendingInviteToken;
+  if (inviteToken) state.pendingInviteToken = inviteToken;
+  if (["auth","join"].includes(routeName) && state.user && state.pendingInviteToken) {
+    try { await claimWorkspaceInvite(state.pendingInviteToken); }
+    catch (cause) { state.inviteError = humanError(cause); toast(state.inviteError,"error"); renderJoin(); bindPageEvents(); }
+    return;
+  }
   if (protectedRoute && Date.now() - state.configUpdatedAt > 30_000) await refreshConfig();
   if (protectedRoute && !state.user) {
     if (routeName === "ai" && !state.config?.configured) {
@@ -822,7 +1118,7 @@ async function route(options = {}) {
     navigate("/onboarding");
     return;
   }
-  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, "document-editor": renderDocumentEditor })[routeName]?.();
+  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, team: renderTeam, templates: renderTemplates, guide: renderGuide, more: renderMore, join: renderJoin, "document-editor": renderDocumentEditor })[routeName]?.();
   bindPageEvents();
   refreshIcons(app);
   if (!options.preserveScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -850,7 +1146,7 @@ function bindPageEvents() {
     app.querySelector("#name-field").hidden = !signup;
     app.querySelector("#confirm-field").hidden = !signup;
     app.querySelector("#auth-form").dataset.mode = signup ? "signup" : "login";
-    app.querySelector("#auth-submit-label").textContent = signup ? "Buat akun kepala sekolah" : "Masuk ke KEPSEK AI";
+    app.querySelector("#auth-submit-label").textContent = signup ? "Buat akun" : "Masuk ke workspace";
     app.querySelector("#password").autocomplete = signup ? "new-password" : "current-password";
     app.querySelector("#full-name").required = signup;
     app.querySelector("#confirm-password").required = signup;
@@ -882,6 +1178,24 @@ function bindPageEvents() {
   app.querySelectorAll("[data-document-id]").forEach((card) => { const open = () => navigate(`/documents/${encodeURIComponent(card.dataset.documentId)}`); card.addEventListener("click", open); card.addEventListener("keydown", (event) => { if (["Enter"," "].includes(event.key)) open(); }); });
   app.querySelector("#save-document")?.addEventListener("click", saveDocument);
   app.querySelectorAll("[data-export]").forEach((button) => button.addEventListener("click", () => exportDocument(button.dataset.export)));
+  app.querySelectorAll("[data-open-invite]").forEach((button) => button.addEventListener("click",openInviteDialog));
+  app.querySelectorAll("[data-remove-member]").forEach((button) => button.addEventListener("click",() => removeTeamMember(button.dataset.removeMember)));
+  app.querySelectorAll("[data-cancel-invite]").forEach((button) => button.addEventListener("click",() => cancelWorkspaceInvite(button.dataset.cancelInvite)));
+  app.querySelectorAll("[data-copy-invite]").forEach((button) => button.addEventListener("click",async () => { try { await copyText(button.dataset.copyInvite); toast("Tautan undangan disalin"); } catch (cause) { toast(humanError(cause),"error"); } }));
+  app.querySelectorAll("[data-open-folder]").forEach((button) => button.addEventListener("click",openFolderDialog));
+  app.querySelectorAll("[data-remove-folder]").forEach((button) => button.addEventListener("click",() => removeTemplateFolder(button.dataset.removeFolder)));
+  app.querySelector("#library-search")?.addEventListener("input",(event) => {
+    const query = String(event.target.value || "").trim().toLowerCase();
+    app.querySelectorAll("[data-library-search]").forEach((card) => { card.hidden = query && !card.dataset.librarySearch.includes(query); });
+  });
+  app.querySelector("[data-invite-logout]")?.addEventListener("click",logoutForInvite);
+}
+
+async function logoutForInvite() {
+  const token = state.pendingInviteToken;
+  if (state.supabase && !state.demo) await state.supabase.auth.signOut();
+  state.user = null; state.session = null; state.school = null; state.membership = null; state.inviteError = ""; state.pendingInviteToken = token;
+  navigate(`/auth?invite=${encodeURIComponent(token)}&mode=login`);
 }
 
 async function handleAuth(event) {
@@ -902,25 +1216,59 @@ async function handleAuth(event) {
       state.documents = [...demoDocuments];
       state.sources = [...demoSources];
       state.agendas = [...demoAgendas];
-      navigate("/dashboard");
+      state.teamMembers = [...demoTeamMembers];
+      state.templateFolders = [...demoTemplateFolders];
+      if (state.pendingInviteToken) await claimWorkspaceInvite(state.pendingInviteToken);
+      else navigate("/dashboard");
       return;
     }
     if (form.dataset.mode === "signup") {
-      const { data: result, error: authError } = await state.supabase.auth.signUp({ email: data.email, password: data.password, options: { data: { full_name: data.fullName }, emailRedirectTo: `${window.location.origin}/auth` } });
+      const inviteQuery = state.pendingInviteToken ? `?invite=${encodeURIComponent(state.pendingInviteToken)}` : "";
+      const { data: result, error: authError } = await state.supabase.auth.signUp({ email: data.email, password: data.password, options: { data: { full_name: data.fullName }, emailRedirectTo: `${window.location.origin}/auth${inviteQuery}` } });
       if (authError) throw authError;
       if (!result.session) { state.authNotice = data.email; renderAuth(); bindPageEvents(); return; }
-      state.session = result.session; state.user = result.user; navigate("/onboarding");
+      state.session = result.session; state.user = result.user;
+      if (state.pendingInviteToken) await claimWorkspaceInvite(state.pendingInviteToken);
+      else navigate("/onboarding");
     } else {
       const { data: result, error: authError } = await state.supabase.auth.signInWithPassword({ email: data.email, password: data.password });
       if (authError) throw authError;
       state.session = result.session; state.user = result.user;
-      await loadWorkspace();
-      navigate(state.school ? "/dashboard" : "/onboarding");
+      if (state.pendingInviteToken) await claimWorkspaceInvite(state.pendingInviteToken);
+      else {
+        await loadWorkspace();
+        navigate(state.school ? "/dashboard" : "/onboarding");
+      }
     }
   } catch (cause) {
+    if (state.pendingInviteToken && state.user && !state.school && state.supabase && !state.demo) {
+      await state.supabase.auth.signOut();
+      state.user = null; state.session = null;
+    }
     error.textContent = humanError(cause);
     error.hidden = false;
   } finally { submit.disabled = false; }
+}
+
+async function claimWorkspaceInvite(token) {
+  if (!token) return;
+  if (state.demo || !state.supabase) {
+    state.school = demoSchool;
+    state.membership = { isOwner:false, access:"full" };
+    state.teamMembers = [...demoTeamMembers];
+    state.templateFolders = [...demoTemplateFolders];
+    state.pendingInviteToken = "";
+    state.inviteError = "";
+    navigate("/dashboard");
+    return;
+  }
+  const { error } = await state.supabase.rpc("kepsek_claim_workspace_invite",{ p_invite_token:token });
+  if (error) throw error;
+  state.pendingInviteToken = "";
+  state.inviteError = "";
+  await loadWorkspace();
+  toast("Anda berhasil bergabung ke workspace sekolah");
+  navigate("/dashboard");
 }
 
 async function handleOnboarding(event) {
@@ -942,7 +1290,7 @@ async function handleOnboarding(event) {
     if (error) throw error;
     const { error: profileError } = await state.supabase.from("kepsek_profiles").upsert({ user_id: state.user.id, principal_name: values.principalName }, { onConflict: "user_id" });
     if (profileError) throw profileError;
-    state.school = normalizeSchool(schoolRow); state.membership = { role: "owner" };
+    state.school = normalizeSchool(schoolRow); state.membership = { isOwner:true, access:"full" };
     toast("Workspace sekolah berhasil dibuat");
     if (state.pendingFiles?.length) {
       await handleFiles(state.pendingFiles);
@@ -1049,7 +1397,7 @@ async function submitAssistantMessage(message) {
   renderAssistant();
   bindPageEvents();
   try {
-    if (state.demo || !state.supabase) throw new Error("Hubungkan workspace sekolah sebelum menggunakan Asisten Kepsek.");
+    if (state.demo || !state.supabase) throw new Error("Hubungkan workspace sekolah sebelum menggunakan Asisten AI.");
     const session = await activeSession();
     if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
     const response = await fetch("/api/chat", {
@@ -1227,22 +1575,28 @@ function safeFilename(value) { return value.normalize("NFKD").replace(/[^a-zA-Z0
 
 async function loadWorkspace() {
   if (!state.supabase || !state.user) return;
-  const { data, error } = await state.supabase.from("kepsek_schools").select("*").eq("owner_user_id",state.user.id).order("created_at",{ascending:true}).limit(1).maybeSingle();
+  const { data, error } = await state.supabase.from("kepsek_schools").select("*").order("created_at",{ascending:true}).limit(1).maybeSingle();
   if (error) throw error;
-  state.membership = data ? { role:"owner" } : null;
+  state.membership = data ? { isOwner:data.owner_user_id === state.user.id, access:"full" } : null;
   state.school = normalizeSchool(data);
   if (!state.school) return;
   const calendarStart = new Date(state.calendarYear,0,1).toISOString();
   const calendarEnd = new Date(state.calendarYear+1,0,1).toISOString();
-  const [docs,sources,projects,agendas,assistant] = await Promise.all([
+  const [docs,sources,projects,agendas,assistant,members,invites,folders] = await Promise.all([
     state.supabase.from("kepsek_documents").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_sources").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}),
     state.supabase.from("kepsek_projects").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_agendas").select("*").eq("school_id",state.school.id).gte("starts_at",calendarStart).lt("starts_at",calendarEnd).order("starts_at",{ascending:true}),
-    state.supabase.from("kepsek_assistant_messages").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}).limit(60),
+    state.supabase.from("kepsek_assistant_messages").select("*").eq("school_id",state.school.id).eq("user_id",state.user.id).order("created_at",{ascending:false}).limit(60),
+    state.supabase.from("kepsek_workspace_members").select("*").eq("school_id",state.school.id).order("joined_at",{ascending:true}),
+    state.supabase.from("kepsek_workspace_invites").select("id,school_id,email,display_name,expires_at,accepted_at,created_at").eq("school_id",state.school.id).order("created_at",{ascending:false}),
+    state.supabase.from("kepsek_template_folders").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
   ]);
   state.documents = docs.data || []; state.sources = sources.data || []; state.projects = projects.data || []; state.agendas = agendas.data || [];
   state.assistantMessages = (assistant.data || []).reverse();
+  state.teamMembers = (members.data || []).filter((member) => member.user_id !== state.school.owner_user_id);
+  state.workspaceInvites = (invites.data || []).map((invite) => ({ ...invite, invite_url:localStorage.getItem(`bb-invite-${invite.id}`) || "" }));
+  state.templateFolders = folders.data || [];
 }
 
 async function activeSession() {
@@ -1253,7 +1607,7 @@ async function activeSession() {
 
 async function logout() {
   if (state.supabase && !state.demo) await state.supabase.auth.signOut();
-  state.user = null; state.session = null; state.school = null; state.documents = []; state.sources = []; state.assistantMessages = []; state.demo = !state.config?.configured; navigate("/auth");
+  state.user = null; state.session = null; state.school = null; state.membership = null; state.documents = []; state.sources = []; state.assistantMessages = []; state.teamMembers = []; state.workspaceInvites = []; state.templateFolders = []; state.pendingInviteToken = ""; state.demo = !state.config?.configured; navigate("/auth");
 }
 
 function humanError(cause) {

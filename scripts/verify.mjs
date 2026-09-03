@@ -1,5 +1,4 @@
 import { access, readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -9,7 +8,7 @@ const required = [
   "index.html",
   "assets/styles.css",
   "assets/app.js",
-  "assets/bantu-beres-logo.jpg",
+  "assets/bantu-beres-symbol.png",
   "manifest.webmanifest",
   "api/config.js",
   "api/health.js",
@@ -19,9 +18,11 @@ const required = [
   "lib/gemini.js",
   "lib/supabase-auth.js",
   "lib/public-config.js",
+  "supabase/migrations/20260902140000_kepsek_core.sql",
   "supabase/migrations/20260902143000_kepsek_workspace_v1.sql",
   "supabase/migrations/20260902230500_harden_agenda_privileges.sql",
   "supabase/migrations/20260903015000_add_kepsek_assistant_messages.sql",
+  "supabase/migrations/20260903143000_add_full_access_team_and_library.sql",
   "vercel.json",
 ];
 
@@ -54,7 +55,7 @@ for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {
 
 const vercel = JSON.parse(await readFile(resolve(root, "vercel.json"), "utf8"));
 if (vercel.framework !== null || vercel.outputDirectory !== "." || vercel.functions) throw new Error("Vercel must use the Other preset, root output, and no stale functions glob");
-for (const route of ["/auth","/onboarding","/dashboard","/calendar","/profile","/documents","/documents/:path*","/ai","/assistant"]) {
+for (const route of ["/auth","/onboarding","/dashboard","/calendar","/profile","/documents","/documents/:path*","/ai","/assistant","/team","/templates","/guide","/more","/join"]) {
   if (!vercel.rewrites?.some((rewrite) => rewrite.source === route && rewrite.destination === "/")) {
     throw new Error(`Missing SPA rewrite for ${route}`);
   }
@@ -66,12 +67,12 @@ for (const expected of ["renderCalendar", "handleAgendaSubmit", "loadAgendasForY
 for (const expected of ["renderAssistant", "handleAssistantSubmit", "kepsek_assistant_messages", "data-clear-assistant", "/api/chat"]) {
   if (!appSource.includes(expected)) throw new Error(`Missing Asisten Kepsek requirement: ${expected}`);
 }
-
-const logo = await readFile(resolve(root, "assets/bantu-beres-logo.jpg"));
-const logoHash = createHash("sha256").update(logo).digest("hex");
-if (logoHash !== "457ce3c58a6616300c03b846b856cd6efb5a9fff54226ea28fd528bf9276b7a6") {
-  throw new Error("The approved Bantu Beres logo was changed");
+for (const expected of ["renderTeam", "kepsek_workspace_invites", "renderTemplates", "driveLibrary", "renderGuide", "kepsek_claim_workspace_invite"]) {
+  if (!appSource.includes(expected)) throw new Error(`Missing team, Drive library, or guide requirement: ${expected}`);
 }
+
+const logo = await readFile(resolve(root, "assets/bantu-beres-symbol.png"));
+if (logo.length < 10_000 || logo.subarray(1,4).toString("ascii") !== "PNG") throw new Error("Transparent Bantu Beres PNG logo is missing or invalid");
 
 const html = await readFile(resolve(root, "index.html"), "utf8");
 if (!html.includes('lang="id"') || !html.includes('name="viewport"')) {

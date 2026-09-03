@@ -1,6 +1,6 @@
 {
-  "name": "Bantu Beres KEPSEK AI",
-  "short_name": "KEPSEK AI",
+  "name": "Bantu Beres – Asisten AI Kepala Sekolah",
+  "short_name": "Bantu Beres",
   "description": "Asisten kerja kepala sekolah dari data hingga dokumen.",
   "start_url": "/",
   "display": "standalone",
@@ -9,9 +9,9 @@
   "lang": "id-ID",
   "icons": [
     {
-      "src": "/assets/bantu-beres-logo.jpg",
-      "sizes": "1536x1536",
-      "type": "image/jpeg",
+      "src": "/assets/bantu-beres-symbol.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

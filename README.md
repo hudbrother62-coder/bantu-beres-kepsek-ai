@@ -1,4 +1,4 @@
-# Bantu Beres KEPSEK AI
+# Bantu Beres – Asisten AI Kepala Sekolah
 
 Asisten kerja khusus kepala sekolah untuk menghubungkan Profil dan Memori Sekolah dengan PBD, KSP, RKJM, RKT, RKAS Assistant, program kegiatan, dokumen, dan pengelolaan kinerja.
 
@@ -12,13 +12,16 @@ Asisten kerja khusus kepala sekolah untuk menghubungkan Profil dan Memori Sekola
 ## Fitur
 
 - Landing page profesional, animasi halus, dan tampilan glass yang terang.
-- Login, pendaftaran, onboarding, dan workspace khusus kepala sekolah.
+- Login, pendaftaran, onboarding, dan workspace sekolah dengan akses tim penuh tanpa berbagi kata sandi.
 - Profil serta Memori Sekolah sebagai sumber data utama.
 - Unggah dokumen ke bucket Supabase privat.
 - Dashboard, agenda, proyek, Pusat Dokumen, editor, status persetujuan, dan ekspor.
 - Alur KSP, PBD, RKJM, RKT, RKAS, administrasi kegiatan, SOP, dan kinerja.
 - Backend Gemini dengan rotasi tiga key dan urutan Flash lalu Flash-Lite.
-- Asisten Kepsek untuk percakapan bebas yang menggunakan Profil, dokumen Memori Sekolah, dan riwayat privat setiap workspace.
+- Asisten AI untuk percakapan bebas yang menggunakan Profil, dokumen Memori Sekolah, dan riwayat privat setiap akun.
+- Tim Sekolah dengan tautan undangan satu kali; tiap anggota memakai email sendiri dan mempunyai akses kerja yang sama.
+- Pustaka Format yang membuka folder asli Google Drive tanpa menyalin ulang file.
+- Panduan operasional lengkap dalam satu halaman dan menu mobile ringkas.
 
 ## Arsitektur
 
@@ -39,9 +42,11 @@ URL dan publishable key Supabase boleh digunakan oleh browser. Perlindungan data
 Migration produksi:
 
 ```text
+supabase/migrations/20260902140000_kepsek_core.sql
 supabase/migrations/20260902143000_kepsek_workspace_v1.sql
 supabase/migrations/20260902230500_harden_agenda_privileges.sql
 supabase/migrations/20260903015000_add_kepsek_assistant_messages.sql
+supabase/migrations/20260903143000_add_full_access_team_and_library.sql
 ```
 
 Semua objek aplikasi ini menggunakan awalan `kepsek_` agar tidak bertabrakan dengan aplikasi lain di project Supabase yang sama. Migration tidak menghapus tabel atau data yang sudah ada.

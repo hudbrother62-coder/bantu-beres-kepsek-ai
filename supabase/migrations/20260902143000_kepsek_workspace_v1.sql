@@ -1,4 +1,4 @@
--- Bantu Beres KEPSEK AI — isolated workspace schema.
+-- Bantu Beres – Asisten AI Kepala Sekolah — isolated workspace schema.
 -- All objects use the kepsek_ prefix so this migration can coexist safely
 -- with other applications in the same Supabase project.
 

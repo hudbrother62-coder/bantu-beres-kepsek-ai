@@ -43,7 +43,7 @@ export default async function handler(request, response) {
     }, null, 2);
 
     const requiredSections = outputBlueprints[type];
-    const systemInstruction = `Anda adalah KEPSEK AI, asisten penyusunan dokumen khusus kepala sekolah di Indonesia.
+    const systemInstruction = `Anda adalah Asisten AI pada aplikasi Bantu Beres – Asisten AI Kepala Sekolah, khusus untuk membantu pekerjaan kepala sekolah di Indonesia.
 Tugas Anda membantu menyusun DRAFT, bukan mengesahkan dokumen atau menggantikan sistem resmi pemerintah.
 
 ATURAN WAJIB:

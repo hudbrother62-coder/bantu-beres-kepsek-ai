@@ -14,7 +14,12 @@
     { "source": "/documents", "destination": "/" },
     { "source": "/documents/:path*", "destination": "/" },
     { "source": "/ai", "destination": "/" },
-    { "source": "/assistant", "destination": "/" }
+    { "source": "/assistant", "destination": "/" },
+    { "source": "/team", "destination": "/" },
+    { "source": "/templates", "destination": "/" },
+    { "source": "/guide", "destination": "/" },
+    { "source": "/more", "destination": "/" },
+    { "source": "/join", "destination": "/" }
   ],
   "headers": [
     {
