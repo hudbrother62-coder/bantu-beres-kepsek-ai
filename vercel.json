@@ -13,7 +13,8 @@
     { "source": "/profile", "destination": "/" },
     { "source": "/documents", "destination": "/" },
     { "source": "/documents/:path*", "destination": "/" },
-    { "source": "/ai", "destination": "/" }
+    { "source": "/ai", "destination": "/" },
+    { "source": "/assistant", "destination": "/" }
   ],
   "headers": [
     {

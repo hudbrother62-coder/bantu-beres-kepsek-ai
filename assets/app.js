@@ -12,6 +12,9 @@ const state = {
   sources: [],
   agendas: [],
   projects: [],
+  assistantMessages: [],
+  assistantSending: false,
+  assistantDraft: "",
   selectedDocument: null,
   aiType: "ksp",
   aiResult: null,
@@ -22,6 +25,7 @@ const state = {
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),
   selectedAgendaDate: "",
+  configUpdatedAt: 0,
   theme: localStorage.getItem("bb-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
 };
 
@@ -72,6 +76,13 @@ const demoAgendas = [
   { id: "agenda-ksp", title: "Review dokumen KSP", description: "Meninjau data, struktur, dan konsistensi KSP bersama tim pengembang.", starts_at: demoAgendaDate(0,10), ends_at: demoAgendaDate(0,11,30), status: "scheduled", priority: "high", metadata: { category:"Kurikulum", location:"Ruang rapat", rundown:"10.00 Cek profil sekolah\n10.30 Tinjau pengorganisasian pembelajaran\n11.00 Catat revisi" } },
   { id: "agenda-literasi", title: "Rapat program literasi", description: "Menetapkan kegiatan, indikator, dan penanggung jawab program literasi.", starts_at: demoAgendaDate(0,13), ends_at: demoAgendaDate(0,14,30), status: "scheduled", priority: "normal", metadata: { category:"Perencanaan", location:"Ruang rapat", rundown:"13.00 Pemaparan kondisi\n13.30 Penetapan program\n14.00 Pembagian tugas" } },
   { id: "agenda-supervisi", title: "Tindak lanjut supervisi", description: "Membahas hasil observasi dan rencana pendampingan.", starts_at: demoAgendaDate(1,9), ends_at: demoAgendaDate(1,10), status: "scheduled", priority: "high", metadata: { category:"Supervisi", location:"Ruang kepala sekolah", rundown:"09.00 Refleksi\n09.25 Rencana perbaikan\n09.45 Kesepakatan tindak lanjut" } },
+];
+
+const assistantSuggestions = [
+  "Apa tiga prioritas sekolah yang paling penting saat ini?",
+  "Bantu saya menyiapkan poin rapat minggu ini.",
+  "Apa data Memori Sekolah yang masih perlu dilengkapi?",
+  "Berikan ide program sederhana sesuai kondisi sekolah saya.",
 ];
 
 const aiTypes = {
@@ -211,6 +222,7 @@ function currentRoute() {
     "/profile": "profile",
     "/documents": "documents",
     "/ai": "ai",
+    "/assistant": "assistant",
   }[path] || "landing";
 }
 
@@ -349,6 +361,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <nav class="side-menu" aria-label="Menu aplikasi">
         <div class="menu-label">Ruang kerja</div>
         ${navLink("/dashboard","Beranda","layout-dashboard",active === "dashboard")}
+        ${navLink("/assistant","Asisten Kepsek","brain-circuit",active === "assistant")}
         ${navLink("/calendar","Agenda & Kalender","calendar-days",active === "calendar")}
         ${navLink("/profile","Profil & Memori","database",active === "profile")}
         ${navLink("/ai?type=pbd","Mutu & PBD","chart-no-axes-combined",active === "pbd")}
@@ -366,11 +379,12 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <header class="topbar">
         <div class="page-heading"><small>${new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date())}</small><strong>${escapeHtml(title)}</strong></div>
         <a class="mobile-brand" href="/dashboard" data-route>${brand(true)}</a>
-        <div class="top-actions"><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} Pratinjau AI</button>${themeToggle(false)}<button class="icon-btn" aria-label="Notifikasi">${icon("bell")}<span class="notice-dot"></span></button></div>
+        <div class="top-actions"><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn" aria-label="Notifikasi">${icon("bell")}<span class="notice-dot"></span></button></div>
       </header>
       <main id="main-content" class="content">${content}</main>
       <nav class="mobile-bottom" aria-label="Navigasi mobile">
         <a class="mobile-nav-item ${active === "dashboard" ? "active" : ""}" href="/dashboard" data-route>${icon("home")}Beranda</a>
+        <a class="mobile-nav-item ${active === "assistant" ? "active" : ""}" href="/assistant" data-route>${icon("brain-circuit")}Asisten</a>
         <a class="mobile-nav-item ${active === "calendar" ? "active" : ""}" href="/calendar" data-route>${icon("calendar-days")}Agenda</a>
         <a class="mobile-nav-item ${["ksp","pbd","planning","rkas","activity","performance"].includes(active) ? "active" : ""}" href="/ai" data-route>${icon("sparkles")}Fitur AI</a>
         <a class="mobile-nav-item ${active === "documents" ? "active" : ""}" href="/documents" data-route>${icon("folder")}Dokumen</a>
@@ -389,10 +403,11 @@ function renderDashboard() {
   const upcomingAgendas = currentAgendas().filter((agenda) => new Date(agenda.starts_at) >= startOfToday()).slice(0,3);
   const timeline = todayAgendas.length ? todayAgendas.map((agenda) => agendaTimelineItem(agenda)).join("") : `<div class="agenda-empty compact"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada agenda hari ini</strong><small>Tambahkan kegiatan agar rundown harian tersusun.</small><button class="btn btn-secondary" data-add-agenda data-date="${todayKey}">${icon("plus")} Tambah agenda</button></div>`;
   const priorityRows = upcomingAgendas.length ? upcomingAgendas.map((agenda) => priorityAgendaItem(agenda)).join("") : `<button class="priority" data-add-agenda data-date="${todayKey}"><span class="priority-icon tone-blue">${icon("calendar-days")}</span><span><strong>Susun agenda pertama</strong><small>Tambahkan rapat, supervisi, atau kegiatan sekolah.</small></span><span class="priority-time">Tambah</span></button>`;
+  const aiEnabled = Boolean(state.config?.aiConfigured);
   document.title = "Beranda — Bantu Beres KEPSEK AI";
   const content = `<section class="command-hero">
     <div class="welcome-row"><div class="welcome"><small>Selamat datang, ${escapeHtml(principal)} 👋</small><h1>Siap membantu pekerjaan sekolah hari ini.</h1><p>Ada ${docs.filter((doc) => doc.status !== "approved").length || 3} dokumen yang masih perlu ditinjau.</p></div><div class="completion"><div class="completion-ring" style="--completion:${completion}%"><span>${completion}%</span></div><div><small>Kelengkapan workspace</small><strong>${completion >= 80 ? "Sudah baik" : "Hampir siap"}</strong></div></div></div>
-    <form class="ai-command ai-command-paused" id="quick-ai-form">${icon("sparkles")}<input name="prompt" aria-label="Perintah untuk Kepsek AI" placeholder="Fitur AI akan diaktifkan pada tahap berikutnya" disabled><button aria-label="AI belum aktif" disabled>${icon("lock-keyhole")}</button></form>
+    <form class="ai-command ${aiEnabled ? "" : "ai-command-paused"}" id="quick-ai-form">${icon("sparkles")}<input name="prompt" aria-label="Pesan untuk Asisten Kepsek" placeholder="${aiEnabled ? "Tanya Asisten Kepsek tentang sekolah Anda…" : "AI belum aktif — periksa konfigurasi server"}" ${aiEnabled ? "" : "disabled"}><button aria-label="${aiEnabled ? "Kirim ke Asisten Kepsek" : "AI belum aktif"}" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "arrow-right" : "lock-keyhole")}</button></form>
   </section>
   <div class="dashboard-columns">
     <div>
@@ -641,6 +656,53 @@ function statusLabel(status) {
   return ({ approved: "Disetujui", review: "Perlu ditinjau", draft: "Draft" })[status] || "Draft";
 }
 
+function renderAssistantText(value = "") {
+  return escapeHtml(value)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^###\s+(.+)$/gm, "<h4>$1</h4>")
+    .replace(/^##\s+(.+)$/gm, "<h3>$1</h3>")
+    .replace(/^#\s+(.+)$/gm, "<h2>$1</h2>")
+    .replace(/^[-•]\s+(.+)$/gm, "<span class=\"assistant-list-item\">$1</span>")
+    .replace(/\n/g, "<br>");
+}
+
+function assistantMessage(message) {
+  const role = message.role === "assistant" ? "assistant" : "user";
+  const label = role === "assistant" ? "Asisten Kepsek" : "Anda";
+  return `<article class="assistant-message ${role} ${message.failed ? "failed" : ""}">
+    <span class="assistant-avatar">${role === "assistant" ? icon("brain-circuit") : escapeHtml(initials((state.school || demoSchool).principal_name))}</span>
+    <div class="assistant-bubble"><div class="assistant-message-meta"><strong>${label}</strong><small>${message.created_at ? new Intl.DateTimeFormat("id-ID",{hour:"2-digit",minute:"2-digit"}).format(new Date(message.created_at)) : "sekarang"}</small></div><div class="assistant-message-text">${renderAssistantText(message.content)}</div>${message.failed ? `<button class="assistant-retry" data-retry-assistant="${escapeHtml(message.id)}">${icon("history")} Coba kirim lagi</button>` : ""}</div>
+  </article>`;
+}
+
+function renderAssistant() {
+  const school = state.school || demoSchool;
+  const aiEnabled = Boolean(state.config?.aiConfigured);
+  const messages = state.assistantMessages || [];
+  const memoryCount = 1 + state.sources.length;
+  document.title = "Asisten Kepsek — Bantu Beres KEPSEK AI";
+  const empty = `<div class="assistant-empty">
+    <span class="assistant-hero-icon">${icon("brain-circuit")}</span>
+    <div><span class="assistant-kicker">Asisten pribadi kepala sekolah</span><h1>Apa yang ingin dibahas hari ini?</h1><p>Saya dapat diajak berpikir, menyiapkan keputusan, membahas pekerjaan sekolah, atau sekadar menjadi teman berdiskusi.</p></div>
+    <div class="assistant-suggestions">${assistantSuggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}">${icon("sparkles")}<span>${escapeHtml(suggestion)}</span></button>`).join("")}</div>
+  </div>`;
+  const content = `<section class="assistant-shell">
+    <header class="assistant-head"><div><div class="eyebrow"><span class="eyebrow-dot"></span>Terhubung ke Memori Sekolah</div><h1>Asisten Kepsek</h1><p>Jawaban disesuaikan dengan ${escapeHtml(school.name)}.</p></div>${messages.length ? `<button class="btn btn-secondary assistant-clear" type="button" data-clear-assistant>${icon("history")} Percakapan baru</button>` : ""}</header>
+    <div class="assistant-memory"><span class="assistant-memory-icon">${icon("shield-check")}</span><span><strong>${memoryCount} sumber memori siap digunakan</strong><small>Profil dan dokumen sekolah hanya digunakan di workspace ini.</small></span><a href="/profile" data-route>Lihat memori ${icon("arrow-right")}</a></div>
+    <div class="assistant-conversation" id="assistant-conversation" aria-live="polite">
+      ${messages.length ? messages.map(assistantMessage).join("") : empty}
+      ${state.assistantSending ? `<article class="assistant-message assistant"><span class="assistant-avatar">${icon("brain-circuit")}</span><div class="assistant-bubble assistant-typing"><span></span><span></span><span></span><small>Asisten sedang berpikir…</small></div></article>` : ""}
+    </div>
+    ${aiEnabled ? `<form class="assistant-composer" id="assistant-form"><textarea name="message" id="assistant-input" rows="1" maxlength="6000" placeholder="Tulis pesan untuk Asisten Kepsek…" aria-label="Pesan untuk Asisten Kepsek" ${state.assistantSending ? "disabled" : ""}>${escapeHtml(state.assistantDraft || "")}</textarea><div class="assistant-compose-foot"><small>Enter untuk kirim • Shift+Enter untuk baris baru</small><button class="btn btn-primary" type="submit" ${state.assistantSending ? "disabled" : ""}>${icon("arrow-up-right")} <span>Kirim</span></button></div></form>` : `<div class="assistant-offline">${icon("circle-alert")}<span><strong>AI belum terhubung</strong><small>Periksa Environment Variables Gemini di Vercel, kemudian redeploy.</small></span></div>`}
+  </section>`;
+  app.innerHTML = appShell(content, "assistant", "Asisten Kepsek");
+  requestAnimationFrame(() => {
+    const conversation = app.querySelector("#assistant-conversation");
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+    if (!state.assistantSending) app.querySelector("#assistant-input")?.focus({ preventScroll: true });
+  });
+}
+
 function renderAi() {
   const params = new URLSearchParams(window.location.search);
   const requestedType = params.get("type");
@@ -743,6 +805,7 @@ function schoolContext(school) {
 async function route(options = {}) {
   const routeName = currentRoute();
   const protectedRoute = !["landing", "auth"].includes(routeName);
+  if (protectedRoute && Date.now() - state.configUpdatedAt > 30_000) await refreshConfig();
   if (protectedRoute && !state.user) {
     if (routeName === "ai" && !state.config?.configured) {
       state.demo = true;
@@ -759,7 +822,7 @@ async function route(options = {}) {
     navigate("/onboarding");
     return;
   }
-  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, "document-editor": renderDocumentEditor })[routeName]?.();
+  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, "document-editor": renderDocumentEditor })[routeName]?.();
   bindPageEvents();
   refreshIcons(app);
   if (!options.preserveScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -804,11 +867,16 @@ function bindPageEvents() {
     const status = app.querySelector("#onboard-file-status");
     if (status) status.textContent = state.pendingFiles.length ? `${state.pendingFiles.length} file dipilih. File akan diunggah setelah workspace berhasil dibuat.` : "Belum ada file dipilih.";
   });
-  app.querySelector("#quick-ai-form")?.addEventListener("submit", (event) => { event.preventDefault(); const prompt = new FormData(event.currentTarget).get("prompt"); state.pendingPrompt = String(prompt || ""); navigate("/ai"); });
+  app.querySelector("#quick-ai-form")?.addEventListener("submit", (event) => { event.preventDefault(); const prompt = String(new FormData(event.currentTarget).get("prompt") || "").trim(); if (!prompt) return; state.assistantDraft = prompt; navigate("/assistant"); });
   if (state.pendingPrompt && app.querySelector("#ai-prompt")) { app.querySelector("#ai-prompt").value = state.pendingPrompt; state.pendingPrompt = ""; }
   app.querySelector("#ai-type")?.addEventListener("change", (event) => { state.aiType = event.target.value; navigate(`/ai?type=${state.aiType}`); });
   app.querySelectorAll("[data-template]").forEach((button) => button.addEventListener("click", () => { app.querySelectorAll("[data-template]").forEach((item) => item.classList.remove("selected")); button.classList.add("selected"); const prompt = app.querySelector("#ai-prompt"); prompt.value = `${prompt.value}\n\n${button.dataset.template}`; }));
   app.querySelector("#ai-form")?.addEventListener("submit", handleGenerate);
+  app.querySelector("#assistant-form")?.addEventListener("submit", handleAssistantSubmit);
+  app.querySelector("#assistant-input")?.addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } });
+  app.querySelectorAll("[data-assistant-prompt]").forEach((button) => button.addEventListener("click", () => submitAssistantMessage(button.dataset.assistantPrompt)));
+  app.querySelectorAll("[data-retry-assistant]").forEach((button) => button.addEventListener("click", () => { const failed = state.assistantMessages.find((message) => message.id === button.dataset.retryAssistant); if (!failed) return; state.assistantMessages = state.assistantMessages.filter((message) => message.id !== failed.id); submitAssistantMessage(failed.content); }));
+  app.querySelector("[data-clear-assistant]")?.addEventListener("click", clearAssistantHistory);
   app.querySelector("#generate-again")?.addEventListener("click", () => { state.aiResult = null; renderAi(); bindPageEvents(); refreshIcons(app); });
   app.querySelector("#open-result")?.addEventListener("click", openGeneratedResult);
   app.querySelectorAll("[data-document-id]").forEach((card) => { const open = () => navigate(`/documents/${encodeURIComponent(card.dataset.documentId)}`); card.addEventListener("click", open); card.addEventListener("keydown", (event) => { if (["Enter"," "].includes(event.key)) open(); }); });
@@ -960,6 +1028,88 @@ async function analyzeFile(file, originalName = file.name) {
   return payload;
 }
 
+async function handleAssistantSubmit(event) {
+  event.preventDefault();
+  const message = String(new FormData(event.currentTarget).get("message") || "").trim();
+  await submitAssistantMessage(message);
+}
+
+async function submitAssistantMessage(message) {
+  const content = String(message || "").trim();
+  if (state.assistantSending || content.length < 2) return;
+  if (!state.config?.aiConfigured) {
+    toast("AI belum terhubung. Periksa konfigurasi Gemini di Vercel.", "error");
+    return;
+  }
+  const previousHistory = state.assistantMessages.filter((item) => !item.failed).slice(-16);
+  const pending = { id: `pending-${crypto.randomUUID()}`, role: "user", content, created_at: new Date().toISOString(), pending: true };
+  state.assistantDraft = "";
+  state.assistantMessages.push(pending);
+  state.assistantSending = true;
+  renderAssistant();
+  bindPageEvents();
+  try {
+    if (state.demo || !state.supabase) throw new Error("Hubungkan workspace sekolah sebelum menggunakan Asisten Kepsek.");
+    const session = await activeSession();
+    if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        schoolId: state.school.id,
+        message: content,
+        history: previousHistory.map((item) => ({ role:item.role, content:item.content })),
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result.error || "Asisten belum dapat menjawab.");
+      error.code = result.code;
+      throw error;
+    }
+    const assistant = { id: crypto.randomUUID(), role:"assistant", content:String(result.reply || "").trim(), model:result.metadata?.model || null, metadata:result.metadata || {}, created_at:new Date().toISOString() };
+    if (!assistant.content) throw new Error("Asisten belum menghasilkan jawaban.");
+    let stored = [pending, assistant];
+    const { data, error } = await state.supabase.from("kepsek_assistant_messages").insert([
+      { school_id:state.school.id, user_id:state.user.id, role:"user", content },
+      { school_id:state.school.id, user_id:state.user.id, role:"assistant", content:assistant.content, model:assistant.model, metadata:{ attempts:assistant.metadata.attempts || 1, usage:assistant.metadata.usage || null } },
+    ]).select();
+    if (error) {
+      console.warn("Assistant history could not be saved", error.message);
+      toast("Jawaban berhasil, tetapi riwayat belum tersimpan.", "error");
+    } else if (Array.isArray(data) && data.length === 2) {
+      stored = data;
+    }
+    state.assistantMessages = state.assistantMessages.filter((item) => item.id !== pending.id).concat(stored);
+  } catch (cause) {
+    pending.pending = false;
+    pending.failed = true;
+    state.assistantDraft = content;
+    toast(humanError(cause), "error");
+  } finally {
+    state.assistantSending = false;
+    renderAssistant();
+    bindPageEvents();
+  }
+}
+
+async function clearAssistantHistory() {
+  if (!window.confirm("Mulai percakapan baru? Riwayat chat pada workspace ini akan dihapus.")) return;
+  try {
+    if (!state.demo && state.supabase) {
+      const { error } = await state.supabase.from("kepsek_assistant_messages").delete().eq("school_id",state.school.id).eq("user_id",state.user.id);
+      if (error) throw error;
+    }
+    state.assistantMessages = [];
+    state.assistantDraft = "";
+    renderAssistant();
+    bindPageEvents();
+    toast("Percakapan baru siap dimulai");
+  } catch (cause) {
+    toast(humanError(cause), "error");
+  }
+}
+
 async function handleGenerate(event) {
   event.preventDefault();
   if (!state.config?.aiConfigured) {
@@ -978,8 +1128,7 @@ async function handleGenerate(event) {
     } else {
       const session = await activeSession();
       if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
-      const context = { school: state.school, sources: state.sources.slice(0,8).map((source) => ({ name:source.name, summary:source.summary, text:(source.extracted_text || "").slice(0,8000) })) };
-      const response = await fetch("/api/generate", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ type:values.type, prompt:values.prompt, context }) });
+      const response = await fetch("/api/generate", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ type:values.type, prompt:values.prompt, schoolId:state.school.id }) });
       result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI belum dapat menyusun dokumen");
     }
@@ -1085,13 +1234,15 @@ async function loadWorkspace() {
   if (!state.school) return;
   const calendarStart = new Date(state.calendarYear,0,1).toISOString();
   const calendarEnd = new Date(state.calendarYear+1,0,1).toISOString();
-  const [docs,sources,projects,agendas] = await Promise.all([
+  const [docs,sources,projects,agendas,assistant] = await Promise.all([
     state.supabase.from("kepsek_documents").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_sources").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}),
     state.supabase.from("kepsek_projects").select("*").eq("school_id",state.school.id).order("updated_at",{ascending:false}),
     state.supabase.from("kepsek_agendas").select("*").eq("school_id",state.school.id).gte("starts_at",calendarStart).lt("starts_at",calendarEnd).order("starts_at",{ascending:true}),
+    state.supabase.from("kepsek_assistant_messages").select("*").eq("school_id",state.school.id).order("created_at",{ascending:false}).limit(60),
   ]);
   state.documents = docs.data || []; state.sources = sources.data || []; state.projects = projects.data || []; state.agendas = agendas.data || [];
+  state.assistantMessages = (assistant.data || []).reverse();
 }
 
 async function activeSession() {
@@ -1102,7 +1253,7 @@ async function activeSession() {
 
 async function logout() {
   if (state.supabase && !state.demo) await state.supabase.auth.signOut();
-  state.user = null; state.session = null; state.school = null; state.documents = []; state.sources = []; state.demo = !state.config?.configured; navigate("/auth");
+  state.user = null; state.session = null; state.school = null; state.documents = []; state.sources = []; state.assistantMessages = []; state.demo = !state.config?.configured; navigate("/auth");
 }
 
 function humanError(cause) {
@@ -1125,10 +1276,7 @@ function fileToBase64(file) {
 function wait(ms) { return new Promise((resolve) => window.setTimeout(resolve,ms)); }
 
 async function init() {
-  try {
-    const response = await fetch("/api/config");
-    state.config = response.ok ? await response.json() : { configured:false };
-  } catch { state.config = { configured:false }; }
+  await refreshConfig();
   state.demo = !state.config.configured;
   if (state.config.configured) {
     try {
@@ -1144,5 +1292,22 @@ async function init() {
   await route();
 }
 
+async function refreshConfig() {
+  try {
+    const response = await fetch(`/api/config?ts=${Date.now()}`, { cache:"no-store" });
+    state.config = response.ok ? await response.json() : { configured:false, aiConfigured:false };
+  } catch {
+    state.config = state.config || { configured:false, aiConfigured:false };
+  }
+  state.configUpdatedAt = Date.now();
+  return state.config;
+}
+
 window.addEventListener("popstate",route);
+window.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState !== "visible" || Date.now() - state.configUpdatedAt < 30_000) return;
+  const wasEnabled = Boolean(state.config?.aiConfigured);
+  await refreshConfig();
+  if (wasEnabled !== Boolean(state.config?.aiConfigured) && !["landing","auth"].includes(currentRoute())) await route({ preserveScroll:true });
+});
 init();

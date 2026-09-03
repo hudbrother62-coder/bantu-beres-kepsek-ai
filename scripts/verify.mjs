@@ -14,18 +14,20 @@ const required = [
   "api/config.js",
   "api/health.js",
   "api/generate.js",
+  "api/chat.js",
   "api/analyze-file.js",
   "lib/gemini.js",
   "lib/supabase-auth.js",
   "lib/public-config.js",
   "supabase/migrations/20260902143000_kepsek_workspace_v1.sql",
   "supabase/migrations/20260902230500_harden_agenda_privileges.sql",
+  "supabase/migrations/20260903015000_add_kepsek_assistant_messages.sql",
   "vercel.json",
 ];
 
 for (const file of required) await access(resolve(root, file));
 
-for (const file of ["assets/app.js", "api/config.js", "api/health.js", "api/generate.js", "api/analyze-file.js", "lib/gemini.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
+for (const file of ["assets/app.js", "api/config.js", "api/health.js", "api/generate.js", "api/chat.js", "api/analyze-file.js", "lib/gemini.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
   const result = spawnSync(process.execPath, ["--check", resolve(root, file)], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${file}: ${result.stderr}`);
 }
@@ -52,7 +54,7 @@ for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {
 
 const vercel = JSON.parse(await readFile(resolve(root, "vercel.json"), "utf8"));
 if (vercel.framework !== null || vercel.outputDirectory !== "." || vercel.functions) throw new Error("Vercel must use the Other preset, root output, and no stale functions glob");
-for (const route of ["/auth","/onboarding","/dashboard","/calendar","/profile","/documents","/documents/:path*","/ai"]) {
+for (const route of ["/auth","/onboarding","/dashboard","/calendar","/profile","/documents","/documents/:path*","/ai","/assistant"]) {
   if (!vercel.rewrites?.some((rewrite) => rewrite.source === route && rewrite.destination === "/")) {
     throw new Error(`Missing SPA rewrite for ${route}`);
   }
@@ -60,6 +62,9 @@ for (const route of ["/auth","/onboarding","/dashboard","/calendar","/profile","
 
 for (const expected of ["renderCalendar", "handleAgendaSubmit", "loadAgendasForYear", "data-add-agenda", "data-edit-agenda", "ai-steps"]) {
   if (!appSource.includes(expected)) throw new Error(`Missing annual agenda or simplified AI workflow: ${expected}`);
+}
+for (const expected of ["renderAssistant", "handleAssistantSubmit", "kepsek_assistant_messages", "data-clear-assistant", "/api/chat"]) {
+  if (!appSource.includes(expected)) throw new Error(`Missing Asisten Kepsek requirement: ${expected}`);
 }
 
 const logo = await readFile(resolve(root, "assets/bantu-beres-logo.jpg"));

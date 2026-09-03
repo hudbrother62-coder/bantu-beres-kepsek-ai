@@ -1,5 +1,5 @@
 import { generateStructured } from "../lib/gemini.js";
-import { jsonBody, requireSchoolAccess, requireUser, sendError } from "../lib/supabase-auth.js";
+import { jsonBody, loadSchoolMemory, requireUser, sendError } from "../lib/supabase-auth.js";
 
 const allowedTypes = new Set(["ksp", "pbd", "rkjm", "rkt", "rkas", "activity", "sop", "performance"]);
 
@@ -22,16 +22,16 @@ export default async function handler(request, response) {
     const body = jsonBody(request, 1_500_000);
     const type = String(body.type || "");
     const prompt = String(body.prompt || "").trim();
-    const school = body.context?.school;
+    const schoolId = String(body.schoolId || body.context?.school?.id || "");
     if (!allowedTypes.has(type)) {
       const error = new Error("Jenis dokumen belum didukung."); error.status = 400; throw error;
     }
     if (prompt.length < 10 || prompt.length > 12_000) {
       const error = new Error("Instruksi harus terdiri dari 10 sampai 12.000 karakter."); error.status = 400; throw error;
     }
-    await requireSchoolAccess(token, user.id, school?.id);
+    const { school, sources } = await loadSchoolMemory(token, user.id, schoolId, 8);
 
-    const sourceContext = (body.context?.sources || []).slice(0, 8).map((source, index) => `SUMBER ${index + 1}: ${source.name}\nRingkasan: ${source.summary || "-"}\nIsi yang diekstrak:\n${String(source.text || "").slice(0, 8_000)}`).join("\n\n");
+    const sourceContext = sources.map((source, index) => `SUMBER ${index + 1}: ${source.name}\nRingkasan: ${source.summary || "-"}\nIsi yang diekstrak:\n${String(source.extracted_text || "").slice(0, 8_000)}`).join("\n\n");
     const schoolContext = JSON.stringify({
       name: school.name,
       npsn: school.npsn,

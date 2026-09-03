@@ -6,8 +6,8 @@ Asisten kerja khusus kepala sekolah untuk menghubungkan Profil dan Memori Sekola
 
 - Frontend responsif desktop dan mobile siap dipublikasikan di Vercel.
 - Supabase Auth, database, RLS, dan Storage sudah terhubung.
-- AI sengaja dinonaktifkan sampai kunci Gemini server-side dipasang.
-- Saat AI belum aktif, tampilan menampilkan status yang jelas dan tidak menghasilkan data simulasi.
+- AI aktif otomatis saat sedikitnya satu kunci Gemini server-side terbaca.
+- Jika AI belum aktif, tampilan menampilkan status yang jelas dan tidak menghasilkan data simulasi.
 
 ## Fitur
 
@@ -17,7 +17,8 @@ Asisten kerja khusus kepala sekolah untuk menghubungkan Profil dan Memori Sekola
 - Unggah dokumen ke bucket Supabase privat.
 - Dashboard, agenda, proyek, Pusat Dokumen, editor, status persetujuan, dan ekspor.
 - Alur KSP, PBD, RKJM, RKT, RKAS, administrasi kegiatan, SOP, dan kinerja.
-- Backend Gemini dengan tiga key dan urutan Flash lalu Flash-Lite, siap diaktifkan kemudian.
+- Backend Gemini dengan rotasi tiga key dan urutan Flash lalu Flash-Lite.
+- Asisten Kepsek untuk percakapan bebas yang menggunakan Profil, dokumen Memori Sekolah, dan riwayat privat setiap workspace.
 
 ## Arsitektur
 
@@ -28,7 +29,7 @@ Browser
   └── Vercel Functions /api
        ├── validasi token Supabase
        ├── verifikasi kepemilikan sekolah
-       └── Gemini (nonaktif sampai key tersedia)
+       └── Gemini (rotasi key dan fallback model)
 ```
 
 URL dan publishable key Supabase boleh digunakan oleh browser. Perlindungan data tetap dilakukan oleh RLS. Service-role key dan kunci Gemini tidak boleh dimasukkan ke repository atau frontend.
@@ -39,11 +40,13 @@ Migration produksi:
 
 ```text
 supabase/migrations/20260902143000_kepsek_workspace_v1.sql
+supabase/migrations/20260902230500_harden_agenda_privileges.sql
+supabase/migrations/20260903015000_add_kepsek_assistant_messages.sql
 ```
 
 Semua objek aplikasi ini menggunakan awalan `kepsek_` agar tidak bertabrakan dengan aplikasi lain di project Supabase yang sama. Migration tidak menghapus tabel atau data yang sudah ada.
 
-## Mengaktifkan AI nanti
+## Konfigurasi AI
 
 Tambahkan environment variable server-side berikut di Vercel:
 
@@ -57,6 +60,7 @@ MAX_INLINE_FILE_BYTES
 ```
 
 Setelah satu key tersedia, endpoint `/api/config` otomatis mengubah `aiConfigured` menjadi `true`. Kunci tidak pernah dikirim ke browser.
+Kode juga menerima alias `GEMINI_KEY_1` sampai `GEMINI_KEY_3`, serta `GEMINI_API_KEY` atau `GOOGLE_API_KEY` untuk slot pertama.
 
 ## Pemeriksaan lokal
 
