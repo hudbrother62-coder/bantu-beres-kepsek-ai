@@ -81,6 +81,9 @@ for (const expected of ["renderCalendar", "handleAgendaSubmit", "loadAgendasForY
 for (const expected of ["renderAssistant", "handleAssistantSubmit", "kepsek_assistant_messages", "data-clear-assistant", "/api/chat"]) {
   if (!appSource.includes(expected)) throw new Error(`Missing Asisten Kepsek requirement: ${expected}`);
 }
+for (const expected of ["const templateOptions = sources", "renderAi()", "activeForType(state.aiType)"]) {
+  if (!appSource.includes(expected)) throw new Error(`Missing AI module navigation/render requirement: ${expected}`);
+}
 for (const expected of ["renderTeam", "kepsek_workspace_invites", "renderTemplates", "driveLibrary", "renderGuide", "kepsek_claim_workspace_invite"]) {
   if (!appSource.includes(expected)) throw new Error(`Missing team, Drive library, or guide requirement: ${expected}`);
 }

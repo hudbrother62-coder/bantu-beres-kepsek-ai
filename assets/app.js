@@ -1156,6 +1156,10 @@ function renderAi() {
   const type = aiTypes[state.aiType] || aiTypes.ksp;
   const aiEnabled = Boolean(state.config?.aiConfigured);
   const sources = state.sources.length ? state.sources : demoSources;
+  const templateOptions = sources
+    .filter((source) => source.status === "ready" || source.extracted_text)
+    .map((source) => `<option value="${escapeHtml(source.id)}">${escapeHtml(source.name)}</option>`)
+    .join("");
   document.title = `${type.label} — ${APP_NAME}`;
   const sourceChips = sources.slice(0,4).map((source) => `<span class="source-chip">${icon("file-check-2")}${escapeHtml(source.name)}</span>`).join("");
   const content = `<div class="page-intro compact-intro"><div><h1>${escapeHtml(type.label)}</h1><p>${escapeHtml(type.description)}</p></div></div>
