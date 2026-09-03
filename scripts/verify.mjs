@@ -8,6 +8,8 @@ const required = [
   "index.html",
   "assets/styles.css",
   "assets/app.js",
+  "assets/document-format.js",
+  "assets/session-policy.js",
   "assets/bantu-beres-symbol.png",
   "manifest.webmanifest",
   "api/config.js",
@@ -16,6 +18,7 @@ const required = [
   "api/chat.js",
   "api/analyze-file.js",
   "lib/gemini.js",
+  "lib/education-standards.js",
   "lib/supabase-auth.js",
   "lib/public-config.js",
   "supabase/migrations/20260902140000_kepsek_core.sql",
@@ -28,7 +31,7 @@ const required = [
 
 for (const file of required) await access(resolve(root, file));
 
-for (const file of ["assets/app.js", "api/config.js", "api/health.js", "api/generate.js", "api/chat.js", "api/analyze-file.js", "lib/gemini.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
+for (const file of ["assets/app.js", "assets/document-format.js", "assets/session-policy.js", "api/config.js", "api/health.js", "api/generate.js", "api/chat.js", "api/analyze-file.js", "lib/gemini.js", "lib/education-standards.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
   const result = spawnSync(process.execPath, ["--check", resolve(root, file)], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${file}: ${result.stderr}`);
 }
@@ -47,6 +50,14 @@ if (/priceCard|#harga|Paket sekolah|Mulai paket/i.test(appSource)) {
 }
 for (const expected of ['value="Negeri"', 'value="Swasta"', "status: values.status", "data-theme-toggle", "missingFields", "consistencyChecks"]) {
   if (!appSource.includes(expected)) throw new Error(`Missing onboarding, theme, or AI review requirement: ${expected}`);
+}
+for (const expected of ["SESSION_IDLE_MS", 'signOut({ scope:"local" })', "parseDocumentBlocks", "document-preview", "templateSourceId", "qualityScore", "standardReferences"]) {
+  if (!appSource.includes(expected)) throw new Error(`Missing session, formatted document, template, or quality requirement: ${expected}`);
+}
+
+const generateSource = await readFile(resolve(root,"api/generate.js"),"utf8");
+for (const expected of ["generateGroundedText", "reviewDocument", "responseSchema", "standardsContext", "validateGeneratedDocument", "evidence-template-standards-independent-review-v3"]) {
+  if (!generateSource.includes(expected)) throw new Error(`Missing high-quality generation pipeline requirement: ${expected}`);
 }
 
 for (const file of ["package.json", "vercel.json", "manifest.webmanifest"]) {

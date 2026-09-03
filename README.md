@@ -13,11 +13,14 @@ Asisten kerja khusus kepala sekolah untuk menghubungkan Profil dan Memori Sekola
 
 - Landing page profesional, animasi halus, dan tampilan glass yang terang.
 - Login, pendaftaran, onboarding, dan workspace sekolah dengan akses tim penuh tanpa berbagi kata sandi.
+- Sesi tersimpan pada perangkat dan berakhir otomatis setelah dua jam tanpa aktivitas; keluar hanya memutus sesi perangkat tersebut.
 - Profil serta Memori Sekolah sebagai sumber data utama.
 - Unggah dokumen ke bucket Supabase privat.
 - Dashboard, agenda, proyek, Pusat Dokumen, editor, status persetujuan, dan ekspor.
 - Alur KSP, PBD, RKJM, RKT, RKAS, administrasi kegiatan, SOP, dan kinerja.
 - Backend Gemini dengan rotasi tiga key dan urutan Flash lalu Flash-Lite.
+- Pipeline dokumen bertahap: pemetaan bukti dan template, pemeriksaan acuan pemerintah terkini, penyusunan lengkap, audit mutu independen, dan perbaikan otomatis bila hasil belum memenuhi ambang.
+- Pemilih template dari Memori Sekolah, registri acuan pendidikan terverifikasi, skor mutu, pratinjau terformat, serta ekspor Word/PDF/Excel tanpa simbol Markdown.
 - Asisten AI untuk percakapan bebas yang menggunakan Profil, dokumen Memori Sekolah, dan riwayat privat setiap akun.
 - Tim Sekolah dengan tautan undangan satu kali; tiap anggota memakai email sendiri dan mempunyai akses kerja yang sama.
 - Pustaka Format yang membuka folder asli Google Drive tanpa menyalin ulang file.
@@ -31,8 +34,9 @@ Browser
   ├── Supabase Auth + tabel kepsek_* + Storage privat
   └── Vercel Functions /api
        ├── validasi token Supabase
-       ├── verifikasi kepemilikan sekolah
-       └── Gemini (rotasi key dan fallback model)
+       ├── verifikasi akses workspace dan memori sekolah
+       ├── registri standar pendidikan + pemeriksaan Google Search resmi
+       └── Gemini (rotasi key, fallback model, quality gate)
 ```
 
 URL dan publishable key Supabase boleh digunakan oleh browser. Perlindungan data tetap dilakukan oleh RLS. Service-role key dan kunci Gemini tidak boleh dimasukkan ke repository atau frontend.
@@ -84,4 +88,4 @@ python3 -m http.server 3000
 
 `vercel.json` memaksa preset `Other`, menjalankan pemeriksaan build, mempertahankan Vercel Functions dalam folder `api/`, mengatur SPA rewrite, dan memasang security headers. Tidak ada pola `functions: "api/*.js"` yang menyebabkan error deployment lama.
 
-Hasil AI selalu berupa draft dan tidak menggantikan ARKAS, e-Kinerja, Rapor Pendidikan, atau sistem resmi pemerintah.
+Hasil AI berupa dokumen kerja lengkap yang siap ditinjau, diedit, dan disetujui kepala sekolah. Bantu Beres tidak menggantikan pengesahan atau penginputan pada ARKAS, e-Kinerja, Rapor Pendidikan, dan sistem resmi pemerintah.

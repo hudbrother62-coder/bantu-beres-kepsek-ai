@@ -1,6 +1,13 @@
+import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "/assets/document-format.js";
+import { isIdleSession, SESSION_IDLE_MS } from "/assets/session-policy.js";
+
 const app = document.querySelector("#app");
 const toastRegion = document.querySelector("#toast-region");
 const APP_NAME = "Bantu Beres – Asisten AI Kepala Sekolah";
+const SESSION_ACTIVITY_KEY = "bb-session-last-activity";
+const ACTIVITY_WRITE_INTERVAL_MS = 30_000;
+let lastActivityWrite = 0;
+let idleCheckTimer = null;
 
 const state = {
   config: null,
@@ -20,6 +27,7 @@ const state = {
   assistantSending: false,
   assistantDraft: "",
   selectedDocument: null,
+  documentMode: "preview",
   aiType: "ksp",
   aiResult: null,
   demo: false,
@@ -30,6 +38,7 @@ const state = {
   calendarMonth: new Date().getMonth(),
   selectedAgendaDate: "",
   configUpdatedAt: 0,
+  idleLogoutInProgress: false,
   pendingInviteToken: new URLSearchParams(window.location.search).get("token") || new URLSearchParams(window.location.search).get("invite") || "",
   inviteError: "",
   theme: localStorage.getItem("bb-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
@@ -327,7 +336,7 @@ function renderLanding() {
       ${moduleCard("briefcase-business","Kinerja Kepala Sekolah","Pemetaan aktivitas, bukti dukung, refleksi, dan tindak lanjut.")}
       ${moduleCard("files","Pusat Dokumen AI","Versi, status persetujuan, sumber, pencarian, dan ekspor dokumen.")}
     </div></section>
-    <section id="keamanan" class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Pertanyaan umum</div><h2>Jelas sebelum mulai.</h2></div><div class="faq-list"><details class="faq-item"><summary>Apakah hasil AI langsung menjadi dokumen final?</summary><p>Tidak. Semua hasil berstatus draft dan harus diperiksa serta disetujui kepala sekolah sebelum digunakan.</p></details><details class="faq-item"><summary>Apakah Bantu Beres menggantikan ARKAS atau e-Kinerja?</summary><p>Tidak. Bantu Beres membantu menyusun, memeriksa, dan mengelola draft. Penginputan serta pengesahan tetap dilakukan melalui sistem resmi.</p></details><details class="faq-item"><summary>Apakah data sekolah lain dapat terlihat?</summary><p>Tidak. Database menggunakan workspace dan Row Level Security untuk memisahkan akses setiap sekolah.</p></details><details class="faq-item"><summary>Format apa yang dapat diunggah dan diekspor?</summary><p>Dokumen dapat diunggah dalam format Word, Excel, PDF, CSV, teks, atau gambar. Hasil dapat diekspor ke Word, Excel, dan PDF.</p></details></div></section>
+    <section id="keamanan" class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Pertanyaan umum</div><h2>Jelas sebelum mulai.</h2></div><div class="faq-list"><details class="faq-item"><summary>Apakah hasil AI hanya berupa kerangka?</summary><p>Tidak. Sistem menyusun dokumen lengkap, mengikuti memori dan template sekolah, lalu memeriksa struktur serta konsistensinya. Kepala sekolah tetap meninjau dan mengesahkan hasil sebelum digunakan.</p></details><details class="faq-item"><summary>Apakah Bantu Beres menggantikan ARKAS atau e-Kinerja?</summary><p>Tidak. Bantu Beres membantu menyusun, memeriksa, dan mengelola dokumen kerja. Penginputan serta pengesahan tetap dilakukan melalui sistem resmi.</p></details><details class="faq-item"><summary>Apakah data sekolah lain dapat terlihat?</summary><p>Tidak. Database menggunakan workspace dan Row Level Security untuk memisahkan akses setiap sekolah.</p></details><details class="faq-item"><summary>Format apa yang dapat diunggah dan diekspor?</summary><p>Dokumen dapat diunggah dalam format Word, Excel, PDF, CSV, teks, atau gambar. Hasil dapat diekspor ke Word, Excel, dan PDF.</p></details></div></section>
     <section class="final-cta"><h2>Lebih sedikit mengulang administrasi. Lebih banyak waktu memimpin sekolah.</h2><p>Bangun Memori Sekolah dan mulai susun pekerjaan pertama bersama Bantu Beres.</p><button class="btn btn-primary" data-route-to="/auth">Buat workspace sekolah ${icon("arrow-right")}</button></section>
     <footer class="public-footer"><a href="/" data-route>${brand()}</a><span>© ${new Date().getFullYear()} Bantu Beres. Asisten AI membantu menyusun draft dan bukan sistem resmi pemerintah.</span><div class="footer-links"><a href="#">Privasi</a><a href="#">Ketentuan</a><a href="#cara-kerja">Cara kerja</a></div></footer>
   </main>`;
@@ -663,6 +672,7 @@ function renderProfile() {
   const school = state.school || demoSchool;
   const profile = school.profile_data || {};
   const sources = state.sources.length ? state.sources : demoSources;
+  const templateOptions = sources.filter((source) => source.status === "ready" || source.extracted_text).map((source) => `<option value="${escapeHtml(source.id)}">${escapeHtml(source.name)}</option>`).join("");
   document.title = `Profil & Memori Sekolah — ${APP_NAME}`;
   const sourceRows = sources.map((source) => `<div class="source-row"><span class="source-icon">${icon(source.mime_type?.includes("spreadsheet") || source.name?.match(/xlsx|xls|csv/i) ? "file-spreadsheet" : source.mime_type?.includes("pdf") ? "file-text" : "files")}</span><span><strong>${escapeHtml(source.name)}</strong><small>${escapeHtml(source.summary || "Tersimpan di Memori Sekolah")}</small></span><span class="badge ${source.status === "ready" ? "badge-green" : "badge-neutral"}">${source.status === "ready" ? "Siap" : "Tersimpan"}</span></div>`).join("");
   const content = `<div class="page-intro"><div><h1>Profil & Memori Sekolah</h1><p>Sumber data utama yang digunakan untuk menyusun seluruh perencanaan dan dokumen sekolah.</p></div><button class="btn btn-primary" form="profile-form">${icon("save")} Simpan perubahan</button></div>
@@ -942,7 +952,7 @@ function statusClass(status) {
 }
 
 function statusLabel(status) {
-  return ({ approved: "Disetujui", review: "Perlu ditinjau", draft: "Draft" })[status] || "Draft";
+  return ({ approved: "Disetujui", review: "Siap ditinjau", draft: "Dalam penyusunan" })[status] || "Dalam penyusunan";
 }
 
 function renderAssistantText(value = "") {
@@ -1011,13 +1021,13 @@ function renderAi() {
           <div class="compose-body simple-compose-body">
             <div class="simple-form-step"><span class="step-badge">1</span><div class="form-group"><label for="ai-type">Dokumen yang ingin dibuat</label><select class="form-control" id="ai-type" name="type">${Object.entries(aiTypes).map(([key,item]) => `<option value="${key}" ${key === state.aiType ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}</select></div></div>
             <div class="simple-form-step"><span class="step-badge">2</span><label class="form-group"><span class="input-label">Apa yang ingin disusun?</span><span class="smart-input"><textarea id="ai-prompt" name="prompt" required>${escapeHtml(defaultPrompt(state.aiType))}</textarea><span class="smart-tools"><small>Tulis dengan bahasa sehari-hari.</small><span class="tool-buttons"><button type="button" class="tool-btn" aria-label="Lampirkan file">${icon("paperclip")}</button><button type="button" class="tool-btn" aria-label="Gunakan suara">${icon("mic")}</button></span></span></span></label></div>
-            <details class="advanced-options"><summary>Pengaturan tambahan</summary><div class="template-grid"><button type="button" class="template-card selected" data-template="Gunakan seluruh data terverifikasi dan buat dokumen baru dari awal."><strong>Buat dari awal</strong><small>Gunakan semua data sekolah.</small></button><button type="button" class="template-card" data-template="Perbarui dokumen sebelumnya dan pertahankan bagian yang masih relevan."><strong>Perbarui dokumen lama</strong><small>Pertahankan bagian yang relevan.</small></button></div></details>
+            <details class="advanced-options"><summary>Pengaturan tambahan</summary><div class="template-grid"><button type="button" class="template-card selected" data-template="Gunakan seluruh data terverifikasi dan buat dokumen baru dari awal."><strong>Buat dari awal</strong><small>Gunakan semua data sekolah.</small></button><button type="button" class="template-card" data-template="Perbarui dokumen sebelumnya dan pertahankan bagian yang masih relevan."><strong>Perbarui dokumen lama</strong><small>Pertahankan bagian yang relevan.</small></button></div><label class="form-group template-source-select"><span class="input-label">Format acuan khusus <small>(opsional)</small></span><select class="form-control" name="templateSourceId"><option value="">Pilih otomatis dari Memori Sekolah</option>${templateOptions}</select><small>Pilih file bila urutan bagian dan tabelnya harus diikuti secara khusus.</small></label></details>
             <div class="memory-strip"><span class="memory-strip-icon">${icon("brain-circuit")}</span><span><strong>Memori sekolah terhubung</strong><small>${sources.length + 1} sumber dari ${escapeHtml((state.school || demoSchool).name)}</small></span><details><summary>Lihat sumber</summary><div class="source-chips">${sourceChips}</div></details></div>
           </div>
-          <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Siap menyusun dan memeriksa draft" : "AI belum aktif"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun draft" : "Segera tersedia"}</button></div>
+          <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Siap menyusun dokumen lengkap" : "AI belum aktif"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun dokumen lengkap" : "Segera tersedia"}</button></div>
         </form>
-        <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun draft…</h2><p>Asisten AI membaca profil, sumber sekolah, dan memeriksa konsistensi hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca Profil Sekolah</div><div class="processing-item"><span>✓</span>Menghubungkan sumber relevan</div><div class="processing-item"><span>•</span>Menyusun dan memeriksa draft</div></div></div>
-        <div class="generation-done" id="generation-done"><span class="done-icon">${icon("file-check-2")}</span><h2>Draft berhasil disusun</h2><p>Dokumen masih berstatus draft dan perlu ditinjau kepala sekolah sebelum digunakan.</p><div class="result-preview"><strong id="result-title">${escapeHtml(type.label)}</strong><small id="result-summary">Draft siap ditinjau dan diedit.</small></div><div id="result-details" class="result-details"></div><div class="result-actions"><button class="btn btn-secondary" id="generate-again">Buat ulang</button><button class="btn btn-primary" id="open-result">Tinjau dan edit ${icon("arrow-right")}</button></div></div>
+        <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun dokumen lengkap…</h2><p>Asisten memetakan template, membaca memori sekolah, memeriksa acuan resmi, lalu menguji mutu hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca profil, memori, dan template</div><div class="processing-item"><span>✓</span>Memeriksa acuan pendidikan terkini</div><div class="processing-item"><span>•</span>Menyusun, menilai, dan memperbaiki hasil</div></div></div>
+        <div class="generation-done" id="generation-done"><span class="done-icon">${icon("file-check-2")}</span><h2>Dokumen lengkap berhasil disusun</h2><p>Hasil sudah melewati pemeriksaan struktur, konsistensi, sumber, dan format. Kepala sekolah dapat meninjau, mengedit, lalu mengesahkannya.</p><div class="result-preview"><strong id="result-title">${escapeHtml(type.label)}</strong><small id="result-summary">Dokumen siap ditinjau dan diedit.</small></div><div id="result-details" class="result-details"></div><div class="result-actions"><button class="btn btn-secondary" id="generate-again">Susun ulang</button><button class="btn btn-primary" id="open-result">Buka hasil terformat ${icon("arrow-right")}</button></div></div>
       </section>
     </div>`;
   app.innerHTML = appShell(content, activeForType(state.aiType), type.label);
@@ -1030,11 +1040,11 @@ function activeForType(type) {
 function defaultPrompt(type) {
   const school = state.school || demoSchool;
   return ({
-    ksp: `Susun draft KSP tahun ${school.academic_year || "2026/2027"} berdasarkan profil sekolah dan prioritas dari Rapor Pendidikan. Gunakan bahasa formal yang mudah dipahami.`,
+    ksp: `Susun KSP lengkap tahun ${school.academic_year || "2026/2027"} berdasarkan profil sekolah, template yang tersimpan, dan prioritas dari Rapor Pendidikan. Gunakan bahasa formal yang mudah dipahami serta matriks yang rinci.`,
     pbd: "Analisis data mutu sekolah, tentukan indikator prioritas, akar masalah, rekomendasi pembenahan, dan indikator keberhasilannya.",
     rkjm: "Susun RKJM empat tahunan berdasarkan visi, kondisi, dan prioritas sekolah. Hubungkan sasaran, program, indikator, dan target per tahun.",
     rkt: "Susun RKT berdasarkan prioritas sekolah. Sertakan program, kegiatan, indikator, target, jadwal, dan penanggung jawab.",
-    rkas: "Turunkan program RKT menjadi draft kegiatan dan anggaran. Tandai bagian yang perlu diverifikasi terhadap juknis BOSP dan ARKAS.",
+    rkas: "Turunkan program RKT menjadi dokumen kegiatan dan anggaran yang rinci. Periksa keterkaitan dengan Juknis BOSP terkini dan tandai bagian yang wajib diverifikasi sebelum dimasukkan ke ARKAS.",
     activity: "Susun dokumen administrasi kegiatan yang terdiri dari program, SK panitia, surat tugas, undangan, daftar hadir, notulen, berita acara, dan laporan.",
     sop: "Susun SOP sekolah lengkap dengan tujuan, ruang lingkup, penanggung jawab, langkah kerja, waktu layanan, dan dokumen pendukung.",
     performance: "Petakan aktivitas sekolah menjadi dokumen dan bukti dukung kinerja kepala sekolah, lalu susun refleksi serta tindak lanjut.",
@@ -1051,14 +1061,52 @@ function renderDocumentEditor() {
   const contentMeta = typeof doc.content === "object" && doc.content ? doc.content : {};
   const reviewItems = [
     ...(contentMeta.missingFields || []).map((item) => ({ tone: "warning", label: "Perlu dilengkapi", text: item })),
-    ...(contentMeta.assumptions || []).map((item) => ({ tone: "neutral", label: "Asumsi draft", text: item })),
+    ...(contentMeta.assumptions || []).map((item) => ({ tone: "neutral", label: "Asumsi kerja", text: item })),
     ...(contentMeta.consistencyChecks || []).map((item) => ({ tone: item.status === "ok" ? "ok" : "warning", label: item.label || "Pemeriksaan", text: item.note || item.status })),
+    ...(contentMeta.qualityChecks || []).map((item) => ({ tone: item.status === "ok" ? "ok" : "warning", label: item.label || "Mutu dokumen", text: item.note || item.status })),
   ];
   const reviewPanel = reviewItems.length ? `<section class="panel review-panel"><h2 class="section-title">Catatan peninjauan</h2><div class="review-list">${reviewItems.slice(0,8).map((item) => `<div class="review-item ${item.tone}">${icon(item.tone === "ok" ? "circle-check" : item.tone === "warning" ? "circle-alert" : "circle-help")}<span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.text)}</small></span></div>`).join("")}</div></section>` : "";
   const sourcePanel = contentMeta.sources?.length ? `<section class="panel"><h2 class="section-title">Sumber yang digunakan</h2><div class="editor-source-list">${contentMeta.sources.map((source) => `<span>${icon("file-check-2")}${escapeHtml(source)}</span>`).join("")}</div></section>` : "";
-  const content = `<div class="page-intro"><div><h1>${escapeHtml(doc.title)}</h1><p>Versi ${doc.version || 1} • ${statusLabel(doc.status)} • Periksa bagian bertanda [PERLU DIKONFIRMASI]</p></div><button class="btn btn-primary" id="save-document">${icon("save")} Simpan perubahan</button></div>
-    <div class="doc-editor"><section class="editor-paper"><textarea id="document-content" aria-label="Isi dokumen">${escapeHtml(normalizeContent(doc.content))}</textarea></section><aside class="editor-tools"><section class="panel"><h2 class="section-title">Status dokumen</h2><select class="form-control" id="document-status"><option value="draft" ${doc.status === "draft" ? "selected" : ""}>Draft</option><option value="review" ${doc.status === "review" ? "selected" : ""}>Perlu ditinjau</option><option value="approved" ${doc.status === "approved" ? "selected" : ""}>Disetujui</option></select></section>${reviewPanel}${sourcePanel}<section class="panel"><h2 class="section-title">Ekspor dokumen</h2><div class="export-list"><button class="btn btn-secondary" data-export="docx">${icon("file-text")} Word (.docx)</button><button class="btn btn-secondary" data-export="xlsx">${icon("file-spreadsheet")} Excel (.xlsx)</button><button class="btn btn-secondary" data-export="pdf">${icon("file-down")} PDF (.pdf)</button></div></section><button class="btn btn-ghost" data-route-to="/documents">${icon("arrow-left")} Kembali ke dokumen</button></aside></div>`;
+  const standardPanel = contentMeta.standardReferences?.length ? `<section class="panel"><h2 class="section-title">Acuan resmi</h2><div class="editor-standard-list">${contentMeta.standardReferences.map((reference) => `<a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener noreferrer"><strong>${escapeHtml(reference.title)}</strong><small>${escapeHtml(reference.status || "Sumber resmi")}</small></a>`).join("")}</div></section>` : "";
+  const markdown = normalizeContent(doc.content);
+  const stats = documentStatistics(markdown);
+  const content = `<div class="page-intro document-heading"><div><h1>${escapeHtml(doc.title)}</h1><p>Versi ${doc.version || 1} • ${statusLabel(doc.status)} • ${stats.headings} bagian • ${stats.tables} tabel</p></div><button class="btn btn-primary" id="save-document">${icon("save")} Simpan perubahan</button></div>
+    <div class="document-mode-bar" role="tablist" aria-label="Mode dokumen"><button type="button" class="document-mode ${state.documentMode === "preview" ? "active" : ""}" data-document-mode="preview" role="tab" aria-selected="${state.documentMode === "preview"}">${icon("file-text")} Tampilan rapi</button><button type="button" class="document-mode ${state.documentMode === "edit" ? "active" : ""}" data-document-mode="edit" role="tab" aria-selected="${state.documentMode === "edit"}">${icon("save")} Edit isi</button><span>Simbol format tidak akan muncul pada file ekspor.</span></div>
+    <div class="doc-editor"><section class="editor-paper"><div id="document-preview" class="document-preview" ${state.documentMode === "preview" ? "" : "hidden"}>${renderDocumentPreview(markdown)}</div><textarea id="document-content" aria-label="Isi dokumen" ${state.documentMode === "edit" ? "" : "hidden"}>${escapeHtml(markdown)}</textarea></section><aside class="editor-tools"><section class="panel quality-panel"><h2 class="section-title">Kesiapan dokumen</h2><div class="quality-score"><strong>${escapeHtml(contentMeta.qualityScore ?? "—")}${contentMeta.qualityScore != null ? "/100" : ""}</strong><small>${contentMeta.templateReference ? `Mengikuti ${escapeHtml(contentMeta.templateReference)}` : "Siap ditinjau kepala sekolah"}</small></div></section><section class="panel"><h2 class="section-title">Status dokumen</h2><select class="form-control" id="document-status"><option value="draft" ${doc.status === "draft" ? "selected" : ""}>Dalam penyusunan</option><option value="review" ${doc.status === "review" ? "selected" : ""}>Siap ditinjau</option><option value="approved" ${doc.status === "approved" ? "selected" : ""}>Disetujui</option></select></section>${reviewPanel}${sourcePanel}${standardPanel}<section class="panel"><h2 class="section-title">Ekspor tanpa simbol AI</h2><div class="export-list"><button class="btn btn-secondary" data-export="docx">${icon("file-text")} Word terformat (.docx)</button><button class="btn btn-secondary" data-export="xlsx">${icon("file-spreadsheet")} Excel terstruktur (.xlsx)</button><button class="btn btn-secondary" data-export="pdf">${icon("file-down")} PDF siap cetak (.pdf)</button></div></section><button class="btn btn-ghost" data-route-to="/documents">${icon("arrow-left")} Kembali ke dokumen</button></aside></div>`;
   app.innerHTML = appShell(content, "documents", "Editor Dokumen");
+}
+
+function renderDocumentPreview(markdown = "") {
+  let listNumber = 0;
+  return parseDocumentBlocks(markdown).map((block) => {
+    if (block.type !== "list" || !block.ordered) listNumber = 0;
+    if (block.type === "heading") return `<h${Math.min(block.level + 1, 5)} class="document-heading-${block.level}">${escapeHtml(block.text)}</h${Math.min(block.level + 1, 5)}>`;
+    if (block.type === "paragraph") return `<p>${escapeHtml(block.text)}</p>`;
+    if (block.type === "quote") return `<blockquote>${escapeHtml(block.text)}</blockquote>`;
+    if (block.type === "divider") return `<hr>`;
+    if (block.type === "list") {
+      if (block.ordered) listNumber += 1;
+      return `<div class="document-list-item"><span>${block.ordered ? `${listNumber}.` : "•"}</span><p>${escapeHtml(block.text)}</p></div>`;
+    }
+    if (block.type === "table") return `<div class="document-table-wrap"><table><thead><tr>${block.headers.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead><tbody>${block.rows.map((row) => `<tr>${block.headers.map((_, index) => `<td>${escapeHtml(row[index] || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return "";
+  }).join("") || `<div class="document-empty">Dokumen belum memiliki isi.</div>`;
+}
+
+function setDocumentMode(mode) {
+  state.documentMode = mode === "edit" ? "edit" : "preview";
+  const textarea = app.querySelector("#document-content");
+  const preview = app.querySelector("#document-preview");
+  if (!textarea || !preview) return;
+  if (state.documentMode === "preview") preview.innerHTML = renderDocumentPreview(textarea.value);
+  textarea.hidden = state.documentMode !== "edit";
+  preview.hidden = state.documentMode !== "preview";
+  app.querySelectorAll("[data-document-mode]").forEach((button) => {
+    const active = button.dataset.documentMode === state.documentMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (state.documentMode === "edit") textarea.focus();
 }
 
 function normalizeContent(content) {
@@ -1094,6 +1142,10 @@ function schoolContext(school) {
 async function route(options = {}) {
   const routeName = currentRoute();
   const protectedRoute = !["landing", "auth", "join"].includes(routeName);
+  if (protectedRoute && state.session && sessionExpiredByInactivity()) {
+    await expireIdleSession();
+    return;
+  }
   const inviteToken = new URLSearchParams(window.location.search).get("token") || new URLSearchParams(window.location.search).get("invite") || state.pendingInviteToken;
   if (inviteToken) state.pendingInviteToken = inviteToken;
   if (["auth","join"].includes(routeName) && state.user && state.pendingInviteToken) {
@@ -1177,6 +1229,7 @@ function bindPageEvents() {
   app.querySelector("#open-result")?.addEventListener("click", openGeneratedResult);
   app.querySelectorAll("[data-document-id]").forEach((card) => { const open = () => navigate(`/documents/${encodeURIComponent(card.dataset.documentId)}`); card.addEventListener("click", open); card.addEventListener("keydown", (event) => { if (["Enter"," "].includes(event.key)) open(); }); });
   app.querySelector("#save-document")?.addEventListener("click", saveDocument);
+  app.querySelectorAll("[data-document-mode]").forEach((button) => button.addEventListener("click", () => setDocumentMode(button.dataset.documentMode)));
   app.querySelectorAll("[data-export]").forEach((button) => button.addEventListener("click", () => exportDocument(button.dataset.export)));
   app.querySelectorAll("[data-open-invite]").forEach((button) => button.addEventListener("click",openInviteDialog));
   app.querySelectorAll("[data-remove-member]").forEach((button) => button.addEventListener("click",() => removeTeamMember(button.dataset.removeMember)));
@@ -1193,7 +1246,8 @@ function bindPageEvents() {
 
 async function logoutForInvite() {
   const token = state.pendingInviteToken;
-  if (state.supabase && !state.demo) await state.supabase.auth.signOut();
+  if (state.supabase && !state.demo) await state.supabase.auth.signOut({ scope:"local" });
+  localStorage.removeItem(SESSION_ACTIVITY_KEY);
   state.user = null; state.session = null; state.school = null; state.membership = null; state.inviteError = ""; state.pendingInviteToken = token;
   navigate(`/auth?invite=${encodeURIComponent(token)}&mode=login`);
 }
@@ -1228,12 +1282,14 @@ async function handleAuth(event) {
       if (authError) throw authError;
       if (!result.session) { state.authNotice = data.email; renderAuth(); bindPageEvents(); return; }
       state.session = result.session; state.user = result.user;
+      markSessionActivity(true);
       if (state.pendingInviteToken) await claimWorkspaceInvite(state.pendingInviteToken);
       else navigate("/onboarding");
     } else {
       const { data: result, error: authError } = await state.supabase.auth.signInWithPassword({ email: data.email, password: data.password });
       if (authError) throw authError;
       state.session = result.session; state.user = result.user;
+      markSessionActivity(true);
       if (state.pendingInviteToken) await claimWorkspaceInvite(state.pendingInviteToken);
       else {
         await loadWorkspace();
@@ -1242,7 +1298,8 @@ async function handleAuth(event) {
     }
   } catch (cause) {
     if (state.pendingInviteToken && state.user && !state.school && state.supabase && !state.demo) {
-      await state.supabase.auth.signOut();
+      await state.supabase.auth.signOut({ scope:"local" });
+      localStorage.removeItem(SESSION_ACTIVITY_KEY);
       state.user = null; state.session = null;
     }
     error.textContent = humanError(cause);
@@ -1476,7 +1533,7 @@ async function handleGenerate(event) {
     } else {
       const session = await activeSession();
       if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
-      const response = await fetch("/api/generate", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ type:values.type, prompt:values.prompt, schoolId:state.school.id }) });
+      const response = await fetch("/api/generate", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ type:values.type, prompt:values.prompt, templateSourceId:values.templateSourceId || "", schoolId:state.school.id }) });
       result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI belum dapat menyusun dokumen");
     }
@@ -1484,7 +1541,7 @@ async function handleGenerate(event) {
     app.querySelector("#generating").classList.remove("show");
     app.querySelector("#generation-done").classList.add("show");
     app.querySelector("#result-title").textContent = result.title || aiTypes[values.type].label;
-    app.querySelector("#result-summary").textContent = result.summary || "Draft siap ditinjau dan diedit.";
+    app.querySelector("#result-summary").textContent = result.summary || "Dokumen lengkap siap ditinjau dan diedit.";
     app.querySelector("#result-details").innerHTML = renderAiResultDetails(result);
     refreshIcons(app.querySelector("#generation-done"));
   } catch (cause) {
@@ -1500,24 +1557,26 @@ function renderAiResultDetails(result = {}) {
   const sources = Array.isArray(result.sources) ? result.sources : [];
   const okChecks = checks.filter((check) => check?.status === "ok").length;
   const metrics = [
+    ["Skor mutu hasil", result.qualityScore != null ? `${result.qualityScore}/100` : "Diperiksa", Number(result.qualityScore) >= 82 ? "ok" : "warning"],
     ["Bagian perlu dilengkapi", missing.length, missing.length ? "warning" : "ok"],
     ["Pemeriksaan konsistensi", `${okChecks}/${checks.length || 0}`, checks.length && okChecks === checks.length ? "ok" : "neutral"],
     ["Sumber digunakan", sources.length, sources.length ? "ok" : "warning"],
   ];
-  return `<div class="result-metrics">${metrics.map(([label,value,tone]) => `<div class="result-metric ${tone}"><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></div>`).join("")}</div>${missing.length ? `<div class="result-warning">${icon("circle-alert")}<span><strong>Perlu konfirmasi kepala sekolah</strong><small>${escapeHtml(missing.slice(0,3).join(" • "))}${missing.length > 3 ? ` • dan ${missing.length - 3} lainnya` : ""}</small></span></div>` : ""}`;
+  const template = result.templateReference || result.documentMeta?.templateReference;
+  return `<div class="result-metrics">${metrics.map(([label,value,tone]) => `<div class="result-metric ${tone}"><strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small></div>`).join("")}</div>${template ? `<div class="result-template">${icon("files")}<span><strong>Format yang diikuti</strong><small>${escapeHtml(template)}</small></span></div>` : ""}${missing.length ? `<div class="result-warning">${icon("circle-alert")}<span><strong>Perlu konfirmasi kepala sekolah</strong><small>${escapeHtml(missing.slice(0,3).join(" • "))}${missing.length > 3 ? ` • dan ${missing.length - 3} lainnya` : ""}</small></span></div>` : ""}`;
 }
 
 async function openGeneratedResult() {
   if (!state.aiResult) return;
   const type = state.aiType;
-  let doc = { id:crypto.randomUUID(), school_id:state.school.id, title:state.aiResult.title || aiTypes[type].label, type, status:"draft", version:1, content:state.aiResult.content || state.aiResult.markdown || "", updated_at:new Date().toISOString() };
+  let doc = { id:crypto.randomUUID(), school_id:state.school.id, title:state.aiResult.title || aiTypes[type].label, type, status:"review", version:1, content:state.aiResult.content || state.aiResult.markdown || "", updated_at:new Date().toISOString() };
   try {
     if (!state.demo && state.supabase) {
-      const { data, error } = await state.supabase.from("kepsek_documents").insert({ school_id:state.school.id, created_by:state.user.id, type, title:doc.title, status:"draft", content:{ markdown:doc.content, summary:state.aiResult.summary, assumptions:state.aiResult.assumptions || [], missingFields:state.aiResult.missingFields || [], sources:state.aiResult.sources || [], consistencyChecks:state.aiResult.consistencyChecks || [], keyDecisions:state.aiResult.keyDecisions || [], documentMeta:state.aiResult.documentMeta || {} } }).select().single();
+      const { data, error } = await state.supabase.from("kepsek_documents").insert({ school_id:state.school.id, created_by:state.user.id, type, title:doc.title, status:"review", content:{ markdown:doc.content, summary:state.aiResult.summary, assumptions:state.aiResult.assumptions || [], missingFields:state.aiResult.missingFields || [], sources:state.aiResult.sources || [], consistencyChecks:state.aiResult.consistencyChecks || [], qualityChecks:state.aiResult.qualityChecks || [], qualityScore:state.aiResult.qualityScore, standardReferences:state.aiResult.standardReferences || [], templateReference:state.aiResult.templateReference || state.aiResult.documentMeta?.templateReference || "", keyDecisions:state.aiResult.keyDecisions || [], documentMeta:state.aiResult.documentMeta || {} } }).select().single();
       if (error) throw error;
       doc = data;
     }
-    state.documents.unshift(doc); state.selectedDocument = doc; navigate(`/documents/${encodeURIComponent(doc.id)}`);
+    state.documents.unshift(doc); state.selectedDocument = doc; state.documentMode = "preview"; navigate(`/documents/${encodeURIComponent(doc.id)}`);
   } catch (cause) { toast(humanError(cause),"error"); }
 }
 
@@ -1542,28 +1601,96 @@ async function exportDocument(format) {
   if (!doc || !content) return;
   toast(`Menyiapkan file ${format.toUpperCase()}…`);
   try {
+    const blocks = parseDocumentBlocks(content);
     if (format === "docx") {
-      const { Document, Packer, Paragraph, TextRun } = await import("https://esm.sh/docx@9.5.1?bundle");
-      const children = content.split(/\n/).map((line) => new Paragraph({ children:[new TextRun({ text:line || " ", bold:/^(BAB|JUDUL|RENCANA|KURIKULUM)/i.test(line) })] }));
-      const blob = await Packer.toBlob(new Document({ sections:[{ children }] }));
+      const { AlignmentType, Document, Footer, HeadingLevel, PageNumber, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = await import("https://esm.sh/docx@9.5.1?bundle");
+      const headingLevels = [HeadingLevel.TITLE,HeadingLevel.HEADING_1,HeadingLevel.HEADING_2,HeadingLevel.HEADING_3,HeadingLevel.HEADING_4];
+      let orderedNumber = 0;
+      const children = blocks.flatMap((block) => {
+        if (block.type !== "list" || !block.ordered) orderedNumber = 0;
+        if (block.type === "heading") return [new Paragraph({ heading:headingLevels[Math.min(block.level,4)], alignment:block.level === 1 ? AlignmentType.CENTER : AlignmentType.LEFT, spacing:{ before:block.level === 1 ? 240 : 180, after:120 }, children:[new TextRun({ text:block.text, bold:true })] })];
+        if (block.type === "paragraph") return [new Paragraph({ alignment:AlignmentType.JUSTIFIED, spacing:{ after:120, line:360 }, children:[new TextRun({ text:block.text, size:22 })] })];
+        if (block.type === "quote") return [new Paragraph({ indent:{ left:500 }, spacing:{ after:120 }, children:[new TextRun({ text:block.text, italics:true, color:"475569", size:21 })] })];
+        if (block.type === "divider") return [new Paragraph({ spacing:{ before:90, after:90 }, children:[new TextRun({ text:"" })] })];
+        if (block.type === "list") {
+          if (block.ordered) orderedNumber += 1;
+          return [new Paragraph({ indent:{ left:360, hanging:180 }, spacing:{ after:70 }, children:[new TextRun({ text:`${block.ordered ? `${orderedNumber}.` : "•"} ${block.text}`, size:22 })] })];
+        }
+        if (block.type === "table") return [new Table({ width:{ size:100, type:WidthType.PERCENTAGE }, rows:[
+          new TableRow({ tableHeader:true, children:block.headers.map((cell) => new TableCell({ shading:{ fill:"E9EFF8" }, children:[new Paragraph({ children:[new TextRun({ text:cell, bold:true, size:19 })] })] })) }),
+          ...block.rows.map((row) => new TableRow({ children:block.headers.map((_,index) => new TableCell({ children:[new Paragraph({ children:[new TextRun({ text:row[index] || "", size:19 })] })] })) })),
+        ] })];
+        return [];
+      });
+      const footer = new Footer({ children:[new Paragraph({ alignment:AlignmentType.CENTER, children:[new TextRun({ text:`${doc.title}  •  Halaman `, color:"64748B", size:18 }),new TextRun({ children:[PageNumber.CURRENT], color:"64748B", size:18 })] })] });
+      const word = new Document({ creator:APP_NAME, title:doc.title, description:"Dokumen sekolah yang telah diformat oleh Bantu Beres", styles:{ default:{ document:{ run:{ font:"Arial", size:22 }, paragraph:{ spacing:{ line:300 } } } } }, sections:[{ properties:{ page:{ margin:{ top:1134,right:1134,bottom:1134,left:1134 } } }, footers:{ default:footer }, children }] });
+      const blob = await Packer.toBlob(word);
       downloadBlob(blob,`${safeFilename(doc.title)}.docx`);
     } else if (format === "xlsx") {
       const XLSX = await import("https://esm.sh/xlsx@0.18.5?bundle");
       const XLSXApi = XLSX.default || XLSX;
-      const rows = content.split(/\n/).map((line,index) => ({ No:index+1, Isi:line }));
       const book = XLSXApi.utils.book_new();
-      XLSXApi.utils.book_append_sheet(book,XLSXApi.utils.json_to_sheet(rows),"Dokumen");
+      const metadata = typeof doc.content === "object" && doc.content ? doc.content : {};
+      const summary = XLSXApi.utils.aoa_to_sheet([
+        ["DOKUMEN SEKOLAH"], ["Judul",doc.title], ["Sekolah",(state.school || demoSchool).name],
+        ["Status",statusLabel(doc.status)], ["Versi",doc.version || 1], ["Dibuat dengan",APP_NAME],
+        [], ["Ringkasan",metadata.summary || cleanDocumentText(content).slice(0,800)],
+      ]);
+      summary["!cols"] = [{ wch:22 },{ wch:95 }];
+      XLSXApi.utils.book_append_sheet(book,summary,"Ringkasan");
+      const narrativeRows = [["Bagian","Isi"]];
+      let currentSection = doc.title;
+      blocks.filter((block) => block.type !== "table" && block.type !== "divider").forEach((block) => {
+        if (block.type === "heading") currentSection = block.text;
+        else narrativeRows.push([currentSection,block.text || ""]);
+      });
+      const narrative = XLSXApi.utils.aoa_to_sheet(narrativeRows);
+      narrative["!cols"] = [{ wch:38 },{ wch:110 }];
+      XLSXApi.utils.book_append_sheet(book,narrative,"Narasi");
+      blocks.filter((block) => block.type === "table").forEach((table,index) => {
+        const sheet = XLSXApi.utils.aoa_to_sheet([table.headers,...table.rows]);
+        sheet["!cols"] = table.headers.map((header,column) => ({ wch:Math.min(55,Math.max(15,String(header).length + 4,...table.rows.map((row) => String(row[column] || "").length + 2))) }));
+        XLSXApi.utils.book_append_sheet(book,sheet,`Matriks ${index + 1}`);
+      });
       XLSXApi.writeFile(book,`${safeFilename(doc.title)}.xlsx`);
     } else {
       const { jsPDF } = await import("https://esm.sh/jspdf@2.5.2?bundle");
+      const autoTableModule = await import("https://esm.sh/jspdf-autotable@3.8.4?bundle");
+      const autoTable = autoTableModule.default;
       const pdf = new jsPDF({ unit:"mm", format:"a4" });
-      pdf.setFont("helvetica","normal"); pdf.setFontSize(11);
-      const lines = pdf.splitTextToSize(content,170);
-      let y = 18;
-      for (const line of lines) { if (y > 280) { pdf.addPage(); y = 18; } pdf.text(line,20,y); y += 6; }
+      const margin = 18;
+      let y = 22;
+      const ensureSpace = (height = 12) => { if (y + height > 278) { pdf.addPage(); y = 22; } };
+      const writeText = (text,{ size=10.5,bold=false,indent=0,after=3,lineHeight=5.3 } = {}) => {
+        pdf.setFont("helvetica",bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(29,40,56);
+        const lines = pdf.splitTextToSize(String(text),174-indent);
+        for (const line of lines) { ensureSpace(lineHeight); pdf.text(line,margin+indent,y); y += lineHeight; }
+        y += after;
+      };
+      let listNumber = 0;
+      for (const block of blocks) {
+        if (block.type !== "list" || !block.ordered) listNumber = 0;
+        if (block.type === "heading") { ensureSpace(block.level === 1 ? 24 : 15); writeText(block.text,{ size:block.level === 1 ? 16 : block.level === 2 ? 13 : 11.5,bold:true,after:block.level === 1 ? 7 : 4,lineHeight:block.level === 1 ? 7 : 5.8 }); }
+        else if (block.type === "paragraph") writeText(block.text,{ after:3,lineHeight:5.3 });
+        else if (block.type === "quote") writeText(block.text,{ size:9.5,indent:6,after:4,lineHeight:5 });
+        else if (block.type === "divider") { ensureSpace(6); pdf.setDrawColor(210,220,232); pdf.line(margin,y,192,y); y += 6; }
+        else if (block.type === "list") { if (block.ordered) listNumber += 1; writeText(`${block.ordered ? `${listNumber}.` : "•"} ${block.text}`,{ indent:5,after:1,lineHeight:5.1 }); }
+        else if (block.type === "table") {
+          ensureSpace(20);
+          autoTable(pdf,{ startY:y, head:[block.headers], body:block.rows, margin:{ left:margin,right:margin }, styles:{ font:"helvetica",fontSize:7.5,cellPadding:2,overflow:"linebreak",valign:"top",lineColor:[207,218,232],lineWidth:.2 }, headStyles:{ fillColor:[53,72,105],textColor:255,fontStyle:"bold" }, alternateRowStyles:{ fillColor:[247,249,252] }, didDrawPage:() => { y = 22; } });
+          y = (pdf.lastAutoTable?.finalY || y) + 7;
+        }
+      }
+      const pages = pdf.getNumberOfPages();
+      for (let page = 1; page <= pages; page += 1) {
+        pdf.setPage(page); pdf.setDrawColor(220,226,235); pdf.line(margin,287,192,287);
+        pdf.setFont("helvetica","normal"); pdf.setFontSize(8); pdf.setTextColor(100,116,139);
+        pdf.text(doc.title.slice(0,80),margin,292); pdf.text(`Halaman ${page} dari ${pages}`,192,292,{ align:"right" });
+      }
+      pdf.setProperties({ title:doc.title, subject:"Dokumen sekolah", author:APP_NAME, creator:APP_NAME });
       pdf.save(`${safeFilename(doc.title)}.pdf`);
     }
-    toast("File berhasil dibuat");
+    toast("File terformat berhasil dibuat tanpa simbol Markdown");
   } catch (cause) { toast(`Ekspor gagal: ${humanError(cause)}`,"error"); }
 }
 
@@ -1599,15 +1726,69 @@ async function loadWorkspace() {
   state.templateFolders = folders.data || [];
 }
 
+function lastSessionActivity() {
+  const value = Number(localStorage.getItem(SESSION_ACTIVITY_KEY));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function sessionExpiredByInactivity() {
+  return isIdleSession(lastSessionActivity(),Date.now(),Boolean(state.session));
+}
+
+function markSessionActivity(force = false) {
+  if (!state.session || state.demo || sessionExpiredByInactivity()) return;
+  const now = Date.now();
+  if (!force && now - lastActivityWrite < ACTIVITY_WRITE_INTERVAL_MS) return;
+  localStorage.setItem(SESSION_ACTIVITY_KEY,String(now));
+  lastActivityWrite = now;
+}
+
+function clearWorkspaceState() {
+  state.user = null; state.session = null; state.school = null; state.membership = null;
+  state.documents = []; state.sources = []; state.projects = []; state.agendas = [];
+  state.assistantMessages = []; state.teamMembers = []; state.workspaceInvites = [];
+  state.templateFolders = []; state.pendingInviteToken = ""; state.selectedDocument = null;
+}
+
+async function expireIdleSession() {
+  if (!state.session || state.idleLogoutInProgress) return;
+  state.idleLogoutInProgress = true;
+  try {
+    if (state.supabase && !state.demo) await state.supabase.auth.signOut({ scope:"local" });
+  } catch (cause) {
+    console.warn("Local idle sign-out failed",cause);
+  } finally {
+    localStorage.removeItem(SESSION_ACTIVITY_KEY);
+    clearWorkspaceState();
+    state.demo = !state.config?.configured;
+    state.idleLogoutInProgress = false;
+    navigate("/auth");
+    toast("Sesi berakhir setelah 2 jam tanpa aktivitas. Silakan masuk kembali.","error");
+  }
+}
+
+async function handleSessionActivity() {
+  if (!state.session || state.demo) return;
+  if (sessionExpiredByInactivity()) { await expireIdleSession(); return; }
+  markSessionActivity();
+}
+
 async function activeSession() {
   if (!state.supabase) return null;
+  if (sessionExpiredByInactivity()) { await expireIdleSession(); return null; }
   const { data } = await state.supabase.auth.getSession();
-  state.session = data.session; return data.session;
+  state.session = data.session;
+  state.user = data.session?.user || null;
+  if (data.session && !lastSessionActivity()) markSessionActivity(true);
+  return data.session;
 }
 
 async function logout() {
-  if (state.supabase && !state.demo) await state.supabase.auth.signOut();
-  state.user = null; state.session = null; state.school = null; state.membership = null; state.documents = []; state.sources = []; state.assistantMessages = []; state.teamMembers = []; state.workspaceInvites = []; state.templateFolders = []; state.pendingInviteToken = ""; state.demo = !state.config?.configured; navigate("/auth");
+  if (state.supabase && !state.demo) await state.supabase.auth.signOut({ scope:"local" });
+  localStorage.removeItem(SESSION_ACTIVITY_KEY);
+  clearWorkspaceState();
+  state.demo = !state.config?.configured;
+  navigate("/auth");
 }
 
 function humanError(cause) {
@@ -1638,10 +1819,23 @@ async function init() {
       state.supabase = createClient(state.config.supabaseUrl,state.config.supabasePublishableKey,{ auth:{ persistSession:true,autoRefreshToken:true,detectSessionInUrl:true } });
       const { data } = await state.supabase.auth.getSession();
       state.session = data.session; state.user = data.session?.user || null;
-      if (state.user) await loadWorkspace();
-      state.supabase.auth.onAuthStateChange((_event,session) => { state.session = session; state.user = session?.user || null; });
+      if (state.session && sessionExpiredByInactivity()) {
+        await state.supabase.auth.signOut({ scope:"local" });
+        localStorage.removeItem(SESSION_ACTIVITY_KEY);
+        state.session = null; state.user = null;
+      } else if (state.user) {
+        if (!lastSessionActivity()) markSessionActivity(true);
+        await loadWorkspace();
+      }
+      state.supabase.auth.onAuthStateChange((event,session) => {
+        state.session = session; state.user = session?.user || null;
+        if (!session || event === "SIGNED_OUT") localStorage.removeItem(SESSION_ACTIVITY_KEY);
+        else if (!lastSessionActivity()) markSessionActivity(true);
+      });
     } catch (cause) { console.warn("Supabase initialization failed",cause); state.demo = true; }
   }
+  for (const eventName of ["pointerdown","keydown","touchstart","scroll"]) window.addEventListener(eventName,handleSessionActivity,{ passive:true });
+  idleCheckTimer = window.setInterval(() => { if (sessionExpiredByInactivity()) expireIdleSession(); },60_000);
   state.loading = false;
   await route();
 }
@@ -1659,7 +1853,9 @@ async function refreshConfig() {
 
 window.addEventListener("popstate",route);
 window.addEventListener("visibilitychange", async () => {
-  if (document.visibilityState !== "visible" || Date.now() - state.configUpdatedAt < 30_000) return;
+  if (document.visibilityState !== "visible") return;
+  await handleSessionActivity();
+  if (Date.now() - state.configUpdatedAt < 30_000) return;
   const wasEnabled = Boolean(state.config?.aiConfigured);
   await refreshConfig();
   if (wasEnabled !== Boolean(state.config?.aiConfigured) && !["landing","auth"].includes(currentRoute())) await route({ preserveScroll:true });
