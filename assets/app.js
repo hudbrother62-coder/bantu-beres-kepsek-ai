@@ -329,7 +329,7 @@ function renderLanding() {
     </div></section>
     <section id="keamanan" class="public-section"><div class="section-heading"><div class="eyebrow"><span class="eyebrow-dot"></span>Pertanyaan umum</div><h2>Jelas sebelum mulai.</h2></div><div class="faq-list"><details class="faq-item"><summary>Apakah hasil AI langsung menjadi dokumen final?</summary><p>Tidak. Semua hasil berstatus draft dan harus diperiksa serta disetujui kepala sekolah sebelum digunakan.</p></details><details class="faq-item"><summary>Apakah Bantu Beres menggantikan ARKAS atau e-Kinerja?</summary><p>Tidak. Bantu Beres membantu menyusun, memeriksa, dan mengelola draft. Penginputan serta pengesahan tetap dilakukan melalui sistem resmi.</p></details><details class="faq-item"><summary>Apakah data sekolah lain dapat terlihat?</summary><p>Tidak. Database menggunakan workspace dan Row Level Security untuk memisahkan akses setiap sekolah.</p></details><details class="faq-item"><summary>Format apa yang dapat diunggah dan diekspor?</summary><p>Dokumen dapat diunggah dalam format Word, Excel, PDF, CSV, teks, atau gambar. Hasil dapat diekspor ke Word, Excel, dan PDF.</p></details></div></section>
     <section class="final-cta"><h2>Lebih sedikit mengulang administrasi. Lebih banyak waktu memimpin sekolah.</h2><p>Bangun Memori Sekolah dan mulai susun pekerjaan pertama bersama Bantu Beres.</p><button class="btn btn-primary" data-route-to="/auth">Buat workspace sekolah ${icon("arrow-right")}</button></section>
-    <footer class="public-footer"><a href="/" data-route>${brand()}</a><span>© ${new Date().getFullYear()} Bantu Beres. Asisten AI membantu menyusun draft dan bukan sistem resmi pemerintah.</span><div class="footer-links"><a href="#">Privasi</a><a href="#">Ketentuan</a><a href="/guide" data-route>Panduan</a></div></footer>
+    <footer class="public-footer"><a href="/" data-route>${brand()}</a><span>© ${new Date().getFullYear()} Bantu Beres. Asisten AI membantu menyusun draft dan bukan sistem resmi pemerintah.</span><div class="footer-links"><a href="#">Privasi</a><a href="#">Ketentuan</a><a href="#cara-kerja">Cara kerja</a></div></footer>
   </main>`;
 }
 
@@ -372,7 +372,7 @@ function renderAuth() {
 function renderOnboarding() {
   document.title = `Siapkan Workspace Sekolah — ${APP_NAME}`;
   app.innerHTML = `<main id="main-content" class="onboarding-page">
-    <header class="onboarding-head">${brand()}<div class="onboarding-head-actions">${themeToggle(false)}<button class="btn btn-secondary">${icon("circle-help")} Butuh bantuan</button></div></header>
+    <header class="onboarding-head">${brand()}<div class="onboarding-head-actions">${themeToggle(false)}<button class="btn btn-secondary" type="button" data-route-to="/guide">${icon("circle-help")} Butuh bantuan</button></div></header>
     <div class="onboarding-body">
       <div class="step-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>Siapkan workspace sekolah</div><h1>Kenalkan sekolah Anda</h1><p>Isi data utama terlebih dahulu. Dokumen dapat diunggah sekarang atau nanti.</p></div><span class="step-count">Data awal</span></div>
       <div class="onboard-progress"><span></span></div>
