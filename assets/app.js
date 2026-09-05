@@ -25,6 +25,7 @@ const state = {
   teamMembers: [],
   workspaceInvites: [],
   templateFolders: [],
+  userAiKeys: [],
   teachers: [],
   supervisions: [],
   assistantMessages: [],
@@ -287,6 +288,7 @@ function currentRoute() {
     "/guide": "guide",
     "/more": "more",
     "/join": "join",
+    "/settings": "settings",
   }[path] || "landing";
 }
 
@@ -434,6 +436,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         ${navLink("/calendar","Agenda & Kalender","calendar-days",active === "calendar")}
         ${navLink("/profile","Profil & Memori","database",active === "profile")}
         ${navLink("/team","Tim Sekolah","users",active === "team")}
+        ${navLink("/settings","Pengaturan AI","settings",active === "settings")}
         ${navLink("/ai?type=pbd","Mutu & PBD","chart-no-axes-combined",active === "pbd")}
         ${navLink("/ai?type=ksp","KSP & Kurikulum","book-open-check",active === "ksp")}
         ${navLink("/ai?type=rkt","Perencanaan","route",active === "planning")}
@@ -708,6 +711,18 @@ function renderProfile() {
 
 function profileField(label, name, value, readonly = false, type = "text") {
   return `<div class="form-group"><label for="${name}">${label}</label><input class="form-control" id="${name}" name="${name}" type="${type}" value="${escapeHtml(value)}" ${readonly ? 'readonly aria-readonly="true"' : ""}></div>`;
+}
+
+function renderSettings() {
+  document.title = `Pengaturan AI — ${APP_NAME}`;
+  const providers = state.demo ? [{ provider:"gemini", key_hint:"AIza••••demo" }] : (state.userAiKeys || []);
+  const connected = providers.find((item) => item.provider === "gemini");
+  const content = `<div class="page-intro"><div><span class="page-kicker">Kendali akun</span><h1>Pengaturan AI</h1><p>Gunakan AI bersama milik aplikasi. Jika kuotanya penuh, API key pribadi Anda dipakai hanya untuk akun ini.</p></div></div>
+    <div class="split-layout settings-layout"><section class="panel"><div class="panel-head"><div><h2>API key pribadi</h2><p>Key tidak pernah ditampilkan kembali atau dikirim ke browser setelah disimpan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Aktif" : "Belum diatur"}</span></div>
+      <form id="user-ai-key-form"><div class="form-group"><label for="user-gemini-key">Gemini API key</label><input class="form-control" id="user-gemini-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Masukkan key Gemini Anda"><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Isi ulang untuk menggantinya.` : "Dapatkan dari Google AI Studio. Key ini hanya berlaku untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("lock-keyhole")} Simpan key Gemini</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key pribadi</button>` : ""}</div></form>
+      <div class="provider-list"><div class="provider-row"><span class="provider-mark">G</span><span><strong>Google Gemini</strong><small>Provider utama yang dioptimalkan untuk penyusunan dokumen Bantu Beres.</small></span><span class="badge badge-green">Aktif</span></div><div class="provider-row muted"><span class="provider-mark">C</span><span><strong>ChatGPT / OpenAI</strong><small>Belum diaktifkan pada jalur generasi ini.</small></span><span class="badge badge-neutral">Segera</span></div><div class="provider-row muted"><span class="provider-mark">•</span><span><strong>Provider lain</strong><small>Belum diaktifkan agar aplikasi tidak menjanjikan kompatibilitas palsu.</small></span><span class="badge badge-neutral">Segera</span></div></div>
+    </section><aside><section class="panel video-tutorial"><div class="panel-head"><div><h2>Video tutorial</h2><p>Tempat tutorial pemasangan API key Gemini.</p></div></div><div class="video-placeholder"><span>${icon("play-circle")}</span><strong>Video tutorial akan ditampilkan di sini</strong><small>Area ini siap diisi video panduan.</small></div></section><section class="panel tutorial-copy"><h2 class="section-title">Cara memasukkan API key Gemini</h2><ol><li>Buka Google AI Studio dan masuk dengan akun Google Anda.</li><li>Pilih API key lalu buat key baru untuk project yang sesuai.</li><li>Salin key. Jangan kirimkan key melalui chat atau membagikannya.</li><li>Kembali ke sini, tempel pada kolom Gemini API key, lalu pilih Simpan.</li><li>Gunakan Gemini karena generator dan pemeriksaan mutu aplikasi sudah dioptimalkan untuknya.</li></ol><p class="field-hint">API key aplikasi tetap menjadi jalur awal. Key pribadi dipakai sebagai cadangan khusus akun Anda.</p></section></aside></div>`;
+  app.innerHTML = appShell(content,"settings","Pengaturan AI");
 }
 
 function isWorkspaceOwner() {
@@ -1321,7 +1336,8 @@ async function route(options = {}) {
     navigate("/onboarding");
     return;
   }
-  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, supervision: renderSupervision, team: renderTeam, templates: renderTemplates, guide: renderGuide, more: renderMore, join: renderJoin, "document-editor": renderDocumentEditor })[routeName]?.();
+  if (routeName === "settings" && !state.demo && state.user && !state.userAiKeysLoaded) await loadUserAiKeys();
+  ({ landing: renderLanding, auth: renderAuth, onboarding: renderOnboarding, dashboard: renderDashboard, calendar: renderCalendar, profile: renderProfile, settings: renderSettings, documents: renderDocuments, ai: renderAi, assistant: renderAssistant, supervision: renderSupervision, team: renderTeam, templates: renderTemplates, guide: renderGuide, more: renderMore, join: renderJoin, "document-editor": renderDocumentEditor })[routeName]?.();
   bindPageEvents();
   refreshIcons(app);
   if (!options.preserveScroll) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1530,6 +1546,33 @@ async function handleProfileSave(event) {
     }
     state.school = updated; toast("Profil sekolah berhasil disimpan");
   } catch (cause) { toast(humanError(cause), "error"); }
+}
+
+async function loadUserAiKeys() {
+  const session = await activeSession();
+  if (!session) return;
+  const response = await fetch("/api/user-ai-key", { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "Status API key belum dapat dibaca.");
+  state.userAiKeys = result.providers || [];
+  state.userAiKeysLoaded = true;
+}
+
+async function handleUserAiKeySave(event) {
+  event.preventDefault();
+  const form = event.currentTarget; const errorBox = form.querySelector("#user-ai-key-error"); const submit = form.querySelector("button[type=submit]");
+  const apiKey = String(new FormData(form).get("apiKey") || "").trim(); errorBox.hidden = true; submit.disabled = true;
+  try {
+    const session = await activeSession(); if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
+    const response = await fetch("/api/user-ai-key", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ apiKey }) });
+    const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat disimpan.");
+    state.userAiKeys = [{ provider:"gemini", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; toast("API key Gemini tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
+  } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; } finally { submit.disabled = false; }
+}
+
+async function removeUserAiKey() {
+  if (!confirm("Hapus API key Gemini pribadi dari akun ini?")) return;
+  try { const session = await activeSession(); const response = await fetch("/api/user-ai-key", { method:"DELETE", headers:{ Authorization:`Bearer ${session.access_token}` } }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat dihapus."); state.userAiKeys = []; toast("API key pribadi dihapus"); renderSettings(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); }
 }
 
 async function handleFiles(files) {
