@@ -1,4 +1,5 @@
 import { generateConversation } from "../lib/gemini.js";
+import { getUserGeminiKey } from "../lib/user-ai-key.js";
 import { jsonBody, loadSchoolMemory, requireUser, sendError } from "../lib/supabase-auth.js";
 
 function memoryText(school, sources) {
@@ -43,6 +44,7 @@ export default async function handler(request, response) {
       throw error;
     }
     const { school, sources } = await loadSchoolMemory(token, user.id, schoolId, 8);
+    const userKey = await getUserGeminiKey(token, user.id);
     const systemInstruction = `Anda adalah Asisten AI dalam Bantu Beres – Asisten AI Kepala Sekolah. Anda berbicara langsung dengan kepala sekolah atau anggota tim sekolah yang dipercaya menggunakan bahasa Indonesia yang hangat, jelas, cerdas, dan tidak bertele-tele.
 
 Anda boleh membahas topik umum, melakukan curah gagasan, membantu mengambil keputusan, menyiapkan rapat, merangkum masalah, atau menjelaskan sesuatu. Jika pertanyaan berkaitan dengan sekolah, utamakan Memori Sekolah di bawah ini.
@@ -65,6 +67,7 @@ ${memoryText(school, sources)}`;
       history: history.slice(-16),
       message,
       seed: `${user.id}:${school.id}:assistant`,
+      userKey,
     });
     response.status(200).json(result);
   } catch (cause) {
