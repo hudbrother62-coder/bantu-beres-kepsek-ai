@@ -166,6 +166,8 @@ const iconPaths = {
   "clipboard-check": '<rect width="16" height="18" x="4" y="3" rx="2"/><path d="M9 3V1h6v2M8 12l2 2 5-5"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>',
+  "eye-off": '<path d="m3 3 18 18"/><path d="M10.6 6.2A10.7 10.7 0 0 1 12 6c6.5 0 10 6 10 6a18 18 0 0 1-3 3.8M6.7 6.7C3.8 8.5 2 12 2 12s3.5 6 10 6a10.7 10.7 0 0 0 3.4-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   "file-check-2": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 15l2 2 4-4"/>',
   "file-clock": '<path d="M14 2H6a2 2 0 0 0-2 2v7M14 2v6h6M16 13a5 5 0 1 0 5 5M16 15v3l2 1"/>',
   "file-down": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M12 12v6m-3-3 3 3 3-3"/>',
@@ -185,6 +187,7 @@ const iconPaths = {
   map: '<path d="m3 6 5-3 8 3 5-3v15l-5 3-8-3-5 3Z"/><path d="M8 3v15M16 6v15"/>',
   mic: '<rect width="8" height="13" x="8" y="2" rx="4"/><path d="M4 10a8 8 0 0 0 16 0M12 18v4M8 22h8"/>',
   paperclip: '<path d="m20.5 11.5-8.8 8.8a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5"/>',
+  plug: '<path d="M9 7V3M15 7V3M7 7h10v3a5 5 0 0 1-10 0V7ZM12 15v6M8 21h8"/>',
   "play-circle": '<circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4Z"/>',
   plus: '<path d="M5 12h14M12 5v14"/>',
   route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h6.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H18"/><circle cx="18" cy="5" r="3"/>',
@@ -193,6 +196,7 @@ const iconPaths = {
   "shield-check": '<path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3Z"/><path d="m9 12 2 2 4-4"/>',
   sparkles: '<path d="m12 3-1.4 3.6L7 8l3.6 1.4L12 13l1.4-3.6L17 8l-3.6-1.4ZM5 15l-.8 2.2L2 18l2.2.8L5 21l.8-2.2L8 18l-2.2-.8ZM19 14l-.8 2.2L16 17l2.2.8L19 20l.8-2.2L22 17l-2.2-.8Z"/>',
   "upload-cloud": '<path d="M12 13v8M8 17l4-4 4 4"/><path d="M20.4 17.5A5 5 0 0 0 18 8.2 7 7 0 0 0 4.3 10.5 4 4 0 0 0 5 18h2"/>',
+  video: '<rect width="16" height="12" x="2" y="6" rx="2"/><path d="m18 10 4-2v8l-4-2M8 10l4 2-4 2Z"/>',
   "user-check": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
   "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
@@ -780,11 +784,12 @@ function renderSettings() {
   document.title = `Pengaturan AI — ${APP_NAME}`;
   const providers = state.demo ? [{ provider:"gemini", key_hint:"AIza••••demo" }] : (state.userAiKeys || []);
   const connected = providers.find((item) => item.provider === "gemini");
-  const content = `<div class="page-intro"><div><span class="page-kicker">Kendali akun</span><h1>Pengaturan AI</h1><p>Gunakan AI bersama milik aplikasi. Jika kuotanya penuh, API key pribadi Anda dipakai hanya untuk akun ini.</p></div></div>
-    <div class="split-layout settings-layout"><section class="panel"><div class="panel-head"><div><h2>API key pribadi</h2><p>Key tidak pernah ditampilkan kembali atau dikirim ke browser setelah disimpan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Aktif" : "Belum diatur"}</span></div>
-      <form id="user-ai-key-form"><div class="form-group"><label for="user-gemini-key">Gemini API key</label><input class="form-control" id="user-gemini-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Masukkan key Gemini Anda"><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Isi ulang untuk menggantinya.` : "Dapatkan dari Google AI Studio. Key ini hanya berlaku untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("lock-keyhole")} Simpan key Gemini</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key pribadi</button>` : ""}</div></form>
-      <div class="provider-list"><div class="provider-row"><span class="provider-mark">G</span><span><strong>Google Gemini</strong><small>Provider utama yang dioptimalkan untuk penyusunan dokumen Bantu Beres.</small></span><span class="badge badge-green">Aktif</span></div><div class="provider-row muted"><span class="provider-mark">C</span><span><strong>ChatGPT / OpenAI</strong><small>Belum diaktifkan pada jalur generasi ini.</small></span><span class="badge badge-neutral">Segera</span></div><div class="provider-row muted"><span class="provider-mark">•</span><span><strong>Provider lain</strong><small>Belum diaktifkan agar aplikasi tidak menjanjikan kompatibilitas palsu.</small></span><span class="badge badge-neutral">Segera</span></div></div>
-    </section><aside><section class="panel video-tutorial"><div class="panel-head"><div><h2>Video tutorial</h2><p>Tempat tutorial pemasangan API key Gemini.</p></div></div><div class="video-placeholder"><span>${icon("play-circle")}</span><strong>Video tutorial akan ditampilkan di sini</strong><small>Area ini siap diisi video panduan.</small></div></section><section class="panel tutorial-copy"><h2 class="section-title">Cara memasukkan API key Gemini</h2><ol><li>Buka Google AI Studio dan masuk dengan akun Google Anda.</li><li>Pilih API key lalu buat key baru untuk project yang sesuai.</li><li>Salin key. Jangan kirimkan key melalui chat atau membagikannya.</li><li>Kembali ke sini, tempel pada kolom Gemini API key, lalu pilih Simpan.</li><li>Gunakan Gemini karena generator dan pemeriksaan mutu aplikasi sudah dioptimalkan untuknya.</li></ol><p class="field-hint">API key aplikasi tetap menjadi jalur awal. Key pribadi dipakai sebagai cadangan khusus akun Anda.</p></section></aside></div>`;
+  const content = `<div class="page-intro"><div><span class="page-kicker">Kendali akun</span><h1>Pengaturan AI</h1><p>API key aplikasi dipakai bersama oleh semua akun. Key pribadi ini hanya menjadi cadangan untuk akun Anda saat kuota bersama habis.</p></div></div>
+    <section class="panel byok-panel"><div class="byok-grid"><div><div class="panel-head"><div><h2>Cadangan API key Gemini</h2><p>Masukkan key Gemini milik akun Anda agar tetap dapat bekerja ketika key aplikasi sedang terkena batas penggunaan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Cadangan aktif" : "Belum diatur"}</span></div>
+      <div class="notice-box">${icon("shield-check")}<span><strong>Aman dan khusus akun ini</strong><small>Key disimpan terenkripsi di server dan tidak dapat dilihat oleh kepala sekolah, guru lain, atau browser.</small></span></div>
+      <form id="user-ai-key-form"><div class="form-group"><label for="user-gemini-key">Gemini API key pribadi</label><div class="key-input-wrap"><input class="form-control" id="user-gemini-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Tempel API key Gemini di sini"><button type="button" class="icon-btn key-visibility" data-toggle-user-key aria-label="Tampilkan API key">${icon("eye")}</button></div><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Masukkan key baru untuk menggantinya.` : "Key ini hanya digunakan sebagai cadangan untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("plug")} Simpan & uji koneksi</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key cadangan</button>` : ""}</div></form></div>
+      <div class="video-tutorial"><div class="video-title">${icon("video")}<strong>Video tutorial cara memasukkan API key</strong></div><div class="video-frame"><iframe src="https://www.youtube.com/embed/H3IMP13R1GI" title="Tutorial memasukkan API key Gemini" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><a class="video-link" href="https://youtu.be/H3IMP13R1GI" target="_blank" rel="noopener noreferrer">Buka video di YouTube ${icon("external-link")}</a></div></div>
+      <details class="tutorial-details" open><summary>${icon("book-open-check")} Tutorial tertulis: cara memasukkan API key Gemini</summary><div class="tutorial-columns"><div><h3>1. Dapatkan API key</h3><ol><li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio → API Keys</a>.</li><li>Masuk memakai akun Google Anda.</li><li>Pilih Create API key, lalu pilih atau buat project bila diminta.</li><li>Salin key yang diberikan Google. Jangan membagikannya kepada orang lain.</li></ol></div><div><h3>2. Masukkan ke Bantu Beres</h3><ol><li>Kembali ke halaman ini dan tempel key pada kolom di atas.</li><li>Pilih Simpan & uji koneksi.</li><li>Jika berhasil, status berubah menjadi Cadangan aktif.</li><li>Key pribadi baru dipakai ketika seluruh key aplikasi bersama tidak tersedia.</li></ol></div></div><p class="field-hint">Jangan masukkan API key ke chat, source code, GitHub, atau dokumen yang dibagikan. Video di atas adalah panduan yang dapat diputar langsung dari halaman ini.</p></details></section>`;
   app.innerHTML = appShell(content,"settings","Pengaturan AI");
 }
 
@@ -1442,6 +1447,9 @@ function bindPageEvents() {
   app.querySelector("#auth-form")?.addEventListener("submit", handleAuth);
   app.querySelector("#onboarding-form")?.addEventListener("submit", handleOnboarding);
   app.querySelector("#profile-form")?.addEventListener("submit", handleProfileSave);
+  app.querySelector("#user-ai-key-form")?.addEventListener("submit", handleUserAiKeySave);
+  app.querySelector("[data-remove-user-ai-key]")?.addEventListener("click", removeUserAiKey);
+  app.querySelector("[data-toggle-user-key]")?.addEventListener("click", toggleUserKeyVisibility);
   app.querySelector("#memory-upload")?.addEventListener("change", (event) => handleFiles([...event.target.files]));
   app.querySelector("#onboard-files")?.addEventListener("change", (event) => {
     state.pendingFiles = [...event.target.files];
@@ -1634,6 +1642,16 @@ async function handleUserAiKeySave(event) {
     const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat disimpan.");
     state.userAiKeys = [{ provider:"gemini", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; addNotification("API key Gemini tersimpan", "Key pribadi ini hanya dipakai sebagai cadangan untuk akun Anda.", "/settings"); toast("API key Gemini tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
   } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; } finally { submit.disabled = false; }
+}
+
+function toggleUserKeyVisibility() {
+  const input = app.querySelector("#user-gemini-key");
+  const button = app.querySelector("[data-toggle-user-key]");
+  if (!input || !button) return;
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  button.setAttribute("aria-label", showing ? "Tampilkan API key" : "Sembunyikan API key");
+  button.innerHTML = icon(showing ? "eye" : "eye-off");
 }
 
 async function removeUserAiKey() {
