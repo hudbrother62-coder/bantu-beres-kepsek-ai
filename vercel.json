@@ -17,6 +17,7 @@
     { "source": "/assistant", "destination": "/" },
     { "source": "/supervision", "destination": "/" },
     { "source": "/team", "destination": "/" },
+    { "source": "/settings", "destination": "/" },
     { "source": "/templates", "destination": "/" },
     { "source": "/guide", "destination": "/" },
     { "source": "/more", "destination": "/" },
