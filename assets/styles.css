@@ -1331,3 +1331,15 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+.settings-layout .panel-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+.provider-list { display:grid; gap:10px; margin-top:24px; }
+.provider-row { display:flex; align-items:center; gap:12px; padding:13px; border:1px solid var(--line); border-radius:14px; }
+.provider-row > span:nth-child(2) { flex:1; display:grid; gap:3px; }
+.provider-row small { color:var(--muted); }
+.provider-row.muted { opacity:.7; }
+.provider-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:10px; background:var(--purple-soft); color:var(--purple); font-weight:800; }
+.video-placeholder { min-height:220px; border:1px dashed var(--line-strong); border-radius:16px; display:grid; place-items:center; align-content:center; gap:8px; text-align:center; padding:24px; background:var(--surface-soft); }
+.video-placeholder > span { color:var(--purple); }
+.video-placeholder svg { width:48px; height:48px; }
+.video-placeholder small { color:var(--muted); }
+.tutorial-copy ol { margin:0; padding-left:22px; display:grid; gap:12px; line-height:1.55; }
