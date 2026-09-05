@@ -8,6 +8,7 @@ const toastRegion = document.querySelector("#toast-region");
 const APP_NAME = "Bantu Beres – Asisten AI Kepala Sekolah";
 const SESSION_ACTIVITY_KEY = "bb-session-last-activity";
 const ACTIVITY_WRITE_INTERVAL_MS = 30_000;
+const NOTIFICATIONS_KEY = "bb-notifications-v1";
 let lastActivityWrite = 0;
 let idleCheckTimer = null;
 
@@ -26,6 +27,8 @@ const state = {
   workspaceInvites: [],
   templateFolders: [],
   userAiKeys: [],
+  userAiKeysLoaded: false,
+  notifications: [],
   teachers: [],
   supervisions: [],
   assistantMessages: [],
@@ -251,6 +254,64 @@ function toast(message, type = "success") {
   window.setTimeout(() => item.remove(), 3200);
 }
 
+function notificationStorageKey() {
+  return `${NOTIFICATIONS_KEY}:${state.user?.id || "guest"}`;
+}
+
+function loadNotifications() {
+  try { state.notifications = JSON.parse(localStorage.getItem(notificationStorageKey()) || "[]"); } catch { state.notifications = []; }
+  if (!state.notifications.length) {
+    state.notifications = [{ id:"welcome", title:"Workspace siap digunakan", text:"Gunakan menu Pengaturan AI untuk menambahkan API key Gemini pribadi bila kuota aplikasi sedang penuh.", time:new Date().toISOString(), read:false, route:"/settings" }];
+    saveNotifications();
+  }
+}
+
+function saveNotifications() {
+  localStorage.setItem(notificationStorageKey(), JSON.stringify(state.notifications.slice(0,30)));
+}
+
+function addNotification(title, text, route = "") {
+  loadNotifications();
+  state.notifications.unshift({ id:crypto.randomUUID(), title, text, time:new Date().toISOString(), read:false, route });
+  saveNotifications();
+}
+
+function notificationMarkup() {
+  loadNotifications();
+  const unread = state.notifications.filter((item) => !item.read).length;
+  const rows = state.notifications.length ? state.notifications.slice(0,8).map((item) => `<button type="button" class="notification-row ${item.read ? "" : "unread"}" data-notification-id="${escapeHtml(item.id)}" data-notification-route="${escapeHtml(item.route || "")}"><span class="notification-dot"></span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.text)}</small><time>${escapeHtml(formatNotificationTime(item.time))}</time></span></button>`).join("") : `<div class="notification-empty">Belum ada notifikasi.</div>`;
+  return `<div class="notification-popover" data-notification-panel hidden><div class="notification-head"><div><strong>Notifikasi</strong><small>${unread ? `${unread} belum dibaca` : "Semua sudah dibaca"}</small></div><button type="button" class="panel-link" data-notification-read-all ${unread ? "" : "disabled"}>Tandai dibaca</button></div><div class="notification-list">${rows}</div></div>`;
+}
+
+function formatNotificationTime(value) {
+  const date = new Date(value); if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("id-ID", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }).format(date);
+}
+
+function toggleNotifications() {
+  const panel = app.querySelector("[data-notification-panel]");
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) { loadNotifications(); panel.innerHTML = notificationMarkup().replace(/^<div[^>]*>|<\/div>$/g, ""); }
+}
+
+function renderNotificationsPanel() {
+  const current = app.querySelector("[data-notification-panel]");
+  if (!current) return;
+  const wasOpen = !current.hidden;
+  current.outerHTML = notificationMarkup();
+  const next = app.querySelector("[data-notification-panel]");
+  if (next) next.hidden = !wasOpen;
+  const trigger = app.querySelector("[data-notifications]");
+  if (trigger) trigger.setAttribute("aria-expanded", String(wasOpen));
+  bindPageEvents();
+}
+
+function markNotificationRead(id) {
+  const item = state.notifications.find((notification) => notification.id === id);
+  if (item) { item.read = true; saveNotifications(); }
+}
+
 function refreshIcons() {
   // Icons are rendered inline so the interface remains complete without a CDN.
 }
@@ -425,6 +486,8 @@ function navLink(path, label, iconName, active) {
 function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah") {
   const school = state.school || demoSchool;
   const principal = school.principal_name || state.user?.user_metadata?.full_name || "Kepala Sekolah";
+  loadNotifications();
+  const unreadNotifications = state.notifications.filter((item) => !item.read).length;
   return `${ambient()}<div class="app-shell">
     <aside class="app-sidebar">
       <a href="/dashboard" data-route>${brand()}</a>
@@ -456,7 +519,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <header class="topbar">
         <div class="page-heading"><small>${new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date())}</small><strong>${escapeHtml(title)}</strong></div>
         <a class="mobile-brand" href="/dashboard" data-route>${brand(true)}</a>
-        <div class="top-actions"><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn" aria-label="Notifikasi">${icon("bell")}<span class="notice-dot"></span></button></div>
+        <div class="top-actions"><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn notification-trigger" data-notifications aria-label="Notifikasi" aria-expanded="false">${icon("bell")}<span class="notice-dot" ${unreadNotifications ? "" : "hidden"}></span></button>${notificationMarkup()}</div>
       </header>
       <main id="main-content" class="content">${content}</main>
       <nav class="mobile-bottom" aria-label="Navigasi mobile">
@@ -1350,6 +1413,9 @@ function bindPageEvents() {
   app.querySelectorAll("[data-new-document]").forEach((button) => button.addEventListener("click", () => navigate("/ai")));
   app.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", logout));
   app.querySelectorAll("[data-theme-toggle]").forEach((button) => button.addEventListener("click", toggleTheme));
+  app.querySelector("[data-notifications]")?.addEventListener("click", (event) => { event.stopPropagation(); const button = event.currentTarget; toggleNotifications(); button.setAttribute("aria-expanded", String(!app.querySelector("[data-notification-panel]")?.hidden)); });
+  app.querySelector("[data-notification-read-all]")?.addEventListener("click", () => { state.notifications.forEach((item) => { item.read = true; }); saveNotifications(); renderNotificationsPanel(); });
+  app.querySelectorAll("[data-notification-id]").forEach((item) => item.addEventListener("click", () => { markNotificationRead(item.dataset.notificationId); const route = item.dataset.notificationRoute; if (route) navigate(route); else renderNotificationsPanel(); }));
   app.querySelectorAll("[data-add-agenda]").forEach((button) => button.addEventListener("click", () => openAgendaDialog("",button.dataset.date || state.selectedAgendaDate || localDateKey(new Date()))));
   app.querySelectorAll("[data-edit-agenda]").forEach((button) => button.addEventListener("click", () => openAgendaDialog(button.dataset.editAgenda)));
   app.querySelectorAll("[data-calendar-date]").forEach((button) => button.addEventListener("click", () => { state.selectedAgendaDate = button.dataset.calendarDate; state.calendarMonth = new Date(`${state.selectedAgendaDate}T12:00:00`).getMonth(); renderCalendar(); bindPageEvents(); }));
@@ -1566,13 +1632,13 @@ async function handleUserAiKeySave(event) {
     const session = await activeSession(); if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
     const response = await fetch("/api/user-ai-key", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ apiKey }) });
     const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat disimpan.");
-    state.userAiKeys = [{ provider:"gemini", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; toast("API key Gemini tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
+    state.userAiKeys = [{ provider:"gemini", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; addNotification("API key Gemini tersimpan", "Key pribadi ini hanya dipakai sebagai cadangan untuk akun Anda.", "/settings"); toast("API key Gemini tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
   } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; } finally { submit.disabled = false; }
 }
 
 async function removeUserAiKey() {
   if (!confirm("Hapus API key Gemini pribadi dari akun ini?")) return;
-  try { const session = await activeSession(); const response = await fetch("/api/user-ai-key", { method:"DELETE", headers:{ Authorization:`Bearer ${session.access_token}` } }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat dihapus."); state.userAiKeys = []; toast("API key pribadi dihapus"); renderSettings(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); }
+  try { const session = await activeSession(); const response = await fetch("/api/user-ai-key", { method:"DELETE", headers:{ Authorization:`Bearer ${session.access_token}` } }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat dihapus."); state.userAiKeys = []; addNotification("API key Gemini dihapus", "AI kembali menggunakan key aplikasi bersama untuk akun Anda.", "/settings"); toast("API key pribadi dihapus"); renderSettings(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); }
 }
 
 async function handleFiles(files) {
@@ -1955,6 +2021,7 @@ function clearWorkspaceState() {
   state.documents = []; state.sources = []; state.projects = []; state.agendas = [];
   state.assistantMessages = []; state.teamMembers = []; state.workspaceInvites = [];
   state.templateFolders = []; state.pendingInviteToken = ""; state.selectedDocument = null;
+  state.userAiKeys = []; state.userAiKeysLoaded = false; state.notifications = [];
   state.teachers = []; state.supervisions = [];
 }
 
