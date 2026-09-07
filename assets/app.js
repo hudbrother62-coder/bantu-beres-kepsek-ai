@@ -1592,12 +1592,15 @@ async function handleOnboarding(event) {
       if (state.pendingFiles?.length) await handleFiles(state.pendingFiles);
       navigate("/dashboard"); return;
     }
+    const session = await activeSession();
+    if (!session?.user) throw new Error("Sesi login belum siap. Silakan masuk kembali lalu coba lagi.");
+    state.user = session.user;
     await loadWorkspace();
     if (state.school) { toast("Workspace sekolah Anda sudah tersedia"); navigate("/dashboard"); return; }
     const { data: schoolRow, error } = await state.supabase.from("kepsek_schools").insert({ owner_user_id: state.user.id, name: values.name.trim(), npsn: values.npsn.trim(), level: values.level, status: values.status, school_context: { address: values.address?.trim() || "", principal_name: values.principalName.trim(), onboarding_complete: true, profile_data: {} } }).select().single();
     if (error) throw error;
-    const { error: profileError } = await state.supabase.from("kepsek_profiles").upsert({ user_id: state.user.id, principal_name: values.principalName }, { onConflict: "user_id" });
-    if (profileError) throw profileError;
+    // The auth trigger creates kepsek_profiles. Workspace creation must not
+    // fail if an older Supabase project has not exposed profile upsert yet.
     state.school = normalizeSchool(schoolRow); state.membership = { isOwner:true, access:"full" };
     toast("Workspace sekolah berhasil dibuat");
     if (state.pendingFiles?.length) {
@@ -2091,7 +2094,7 @@ function humanError(cause) {
   if (/kepsek_schools_status_check|violates check constraint/i.test(message)) return "Status atau jenjang sekolah belum sesuai. Pilih nilai yang tersedia lalu coba lagi.";
   if (/kepsek_schools_owner_user_id_key|duplicate key.*owner_user_id/i.test(message)) return "Akun ini sudah memiliki workspace sekolah. Silakan masuk kembali ke dashboard.";
   if (/kepsek_schools_npsn_key|duplicate key.*npsn/i.test(message)) return "NPSN ini sudah digunakan pada workspace lain. Periksa kembali NPSN sekolah.";
-  if (/row-level security|permission denied/i.test(message)) return "Akses data belum diizinkan. Keluar lalu masuk kembali, kemudian coba lagi.";
+  if (cause?.code === "42501" || /permission denied|row-level security/i.test(message)) return "Akses data belum diberikan oleh project Supabase yang tersambung. Periksa koneksi database dan policy aksesnya.";
   if (/Kata sandi yang diulangi|Periksa kembali/i.test(message)) return message;
   if (/fetch/i.test(message)) return "Koneksi ke layanan belum berhasil. Periksa internet dan coba lagi.";
   return message;
