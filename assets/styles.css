@@ -312,6 +312,7 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
 .page-heading small { display: block; margin-bottom: 3px; color: var(--muted); font-size: .8rem; }
 .page-heading strong { display: block; font-size: .96rem; }
 .mobile-brand { display: none; }
+.mobile-ai-settings { display: none; }
 .top-actions { display: flex; align-items: center; gap: 9px; }
 .top-actions { position: relative; }
 .global-search { width: 230px; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 14px; display: flex; align-items: center; gap: 8px; color: var(--muted); background: rgba(255,255,255,.78); transition: width .3s,box-shadow .2s,background .2s; }
@@ -1121,6 +1122,10 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
   .topbar { min-height: 70px; padding: 0 15px; }
   .page-heading { display: none; }
   .mobile-brand { display: flex; }
+  .mobile-ai-settings { min-height: 40px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgba(111,39,143,.22); border-radius: 12px; background: rgba(111,39,143,.08); color: var(--purple); font-size: .7rem; font-weight: 800; text-decoration: none; white-space: nowrap; }
+  .mobile-ai-settings svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .mobile-ai-settings.active { border-color: var(--purple); background: linear-gradient(135deg,rgba(111,39,143,.14),rgba(18,90,169,.09)); }
+  .mobile-ai-settings:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
   .mobile-brand .brand-name { font-size: .9rem; }
   .mobile-brand .brand-product { display: none; }
   .mobile-brand .brand-symbol { width: 34px; height: 34px; flex-basis: 34px; }
@@ -1390,4 +1395,12 @@ textarea.form-control { min-height: 115px; padding-block: 13px; resize: vertical
 .tutorial-copy ol { margin:0; padding-left:22px; display:grid; gap:12px; line-height:1.55; }
 @media (max-width: 880px) {
   .byok-grid, .tutorial-columns { grid-template-columns:1fr; }
+}
+
+/* Keep the header settings shortcut reachable on narrow Android screens. */
+@media (max-width: 360px) {
+  .topbar { padding-inline: 9px; gap: 7px; }
+  .top-actions { gap: 5px; }
+  .mobile-ai-settings { padding-inline: 9px; min-width: 40px; }
+  .mobile-ai-settings span { display: none; }
 }
