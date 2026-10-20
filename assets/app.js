@@ -531,7 +531,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
         <a class="mobile-nav-item ${active === "assistant" ? "active" : ""}" href="/assistant" data-route>${icon("brain-circuit")}Asisten</a>
         <a class="mobile-nav-item ${active === "calendar" ? "active" : ""}" href="/calendar" data-route>${icon("calendar-days")}Agenda</a>
         <a class="mobile-nav-item ${active === "documents" ? "active" : ""}" href="/documents" data-route>${icon("folder")}Dokumen</a>
-        <a class="mobile-nav-item ${["more","team","templates","guide","profile","ksp","pbd","planning","rkas","activity","performance","supervision"].includes(active) ? "active" : ""}" href="/more" data-route>${icon("menu")}Menu</a>
+        <a class="mobile-nav-item ${["more","settings","team","templates","guide","profile","ksp","pbd","planning","rkas","activity","performance","supervision"].includes(active) ? "active" : ""}" href="/more" data-route>${icon("menu")}Menu</a>
       </nav>
     </div>
   </div>`;
@@ -1154,6 +1154,7 @@ function renderMore() {
     ["clipboard-check","Supervisi Akademik","Data guru, instrumen, penilaian, tindak lanjut, dan hasil.","/supervision"],
     ["folder","Pustaka Format","Folder template asli di Google Drive.","/templates"],
     ["circle-help","Panduan Kerja","Petunjuk lengkap dalam satu halaman.","/guide"],
+    ["settings","Pengaturan AI","Masukkan dan kelola API key Gemini pribadi sebagai cadangan.","/settings"],
   ];
   document.title = `Menu — ${APP_NAME}`;
   const content = `<div class="page-intro compact-intro"><div><h1>Semua Menu</h1><p>Pilih pekerjaan yang ingin dibuka.</p></div></div><div class="more-grid">${items.map(([iconName,title,text,path]) => `<button class="more-card" data-route-to="${path}"><span>${icon(iconName)}</span><div><strong>${title}</strong><small>${text}</small></div>${icon("arrow-right")}</button>`).join("")}</div>`;
