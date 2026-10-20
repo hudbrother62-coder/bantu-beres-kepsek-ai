@@ -523,7 +523,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <header class="topbar">
         <div class="page-heading"><small>${new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date())}</small><strong>${escapeHtml(title)}</strong></div>
         <a class="mobile-brand" href="/dashboard" data-route>${brand(true)}</a>
-        <div class="top-actions"><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn notification-trigger" data-notifications aria-label="Notifikasi" aria-expanded="false">${icon("bell")}<span class="notice-dot" ${unreadNotifications ? "" : "hidden"}></span></button>${notificationMarkup()}</div>
+        <div class="top-actions"><a class="mobile-ai-settings ${active === "settings" ? "active" : ""}" href="/settings" data-route aria-label="Pengaturan AI dan API key Gemini" title="Pengaturan AI">${icon("settings")}<span>API Key</span></a><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn notification-trigger" data-notifications aria-label="Notifikasi" aria-expanded="false">${icon("bell")}<span class="notice-dot" ${unreadNotifications ? "" : "hidden"}></span></button>${notificationMarkup()}</div>
       </header>
       <main id="main-content" class="content">${content}</main>
       <nav class="mobile-bottom" aria-label="Navigasi mobile">
@@ -1148,13 +1148,13 @@ function renderGuide() {
 
 function renderMore() {
   const items = [
+    ["settings","Pengaturan AI","Masukkan dan kelola API key Gemini pribadi sebagai cadangan.","/settings"],
     ["sparkles","Fitur AI","KSP, PBD, RKJM, RKT, RKAS, kegiatan, SOP, dan kinerja.","/ai"],
     ["database","Profil & Memori","Data utama dan dokumen sumber sekolah.","/profile"],
     ["users","Tim Sekolah","Akses penuh untuk orang yang membantu.","/team"],
     ["clipboard-check","Supervisi Akademik","Data guru, instrumen, penilaian, tindak lanjut, dan hasil.","/supervision"],
     ["folder","Pustaka Format","Folder template asli di Google Drive.","/templates"],
     ["circle-help","Panduan Kerja","Petunjuk lengkap dalam satu halaman.","/guide"],
-    ["settings","Pengaturan AI","Masukkan dan kelola API key Gemini pribadi sebagai cadangan.","/settings"],
   ];
   document.title = `Menu — ${APP_NAME}`;
   const content = `<div class="page-intro compact-intro"><div><h1>Semua Menu</h1><p>Pilih pekerjaan yang ingin dibuka.</p></div></div><div class="more-grid">${items.map(([iconName,title,text,path]) => `<button class="more-card" data-route-to="${path}"><span>${icon(iconName)}</span><div><strong>${title}</strong><small>${text}</small></div>${icon("arrow-right")}</button>`).join("")}</div>`;
