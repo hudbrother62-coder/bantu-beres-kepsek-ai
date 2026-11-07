@@ -453,6 +453,7 @@ function renderAuth() {
             <div id="auth-error" class="form-error" role="alert" hidden></div>
             <button class="btn btn-primary btn-block" type="submit"><span id="auth-submit-label">${signup ? "Buat akun" : "Masuk ke workspace"}</span>${icon("arrow-right")}</button>
           </form>
+          ${!signup && !inviteToken ? '<p style="text-align:center;margin:12px 0"><a href="/reset-password" class="btn btn-secondary">Lupa password?</a></p>' : ""}
           <div class="auth-foot">${inviteToken ? "Setiap anggota memakai akun sendiri; tidak perlu berbagi kata sandi kepala sekolah." : "Akun ini membuat satu ruang kerja privat untuk sekolah Anda. Data pengguna sekolah lain tidak dapat diakses."}</div>`}
       </div>
     </section>
