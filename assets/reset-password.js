@@ -24,7 +24,7 @@ async function setup(){
 request.addEventListener('submit',async event=>{
  event.preventDefault();if(!client){msg('Koneksi belum siap.',true);return;}
  const email=$('reset-email').value.trim().toLowerCase(),key='bb-kepsek-recovery:'+email;
- if(Date.now()-Number(localStorage.getItem(key)||0)<60*60*1000){msg('Permintaan sebelumnya sudah tercatat di browser ini. Cek inbox dan spam. Tidak membuat permintaan baru.');return;}
+ if(Date.now()-Number(localStorage.getItem(key)||0)<60*1000){msg('Permintaan baru saja dibuat. Cek inbox dan spam, atau coba lagi setelah satu menit.');return;}
  const button=request.querySelector('button');button.disabled=true;msg('Memproses permintaan…');
  try{
   const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/reset-password?mode=finish'});
