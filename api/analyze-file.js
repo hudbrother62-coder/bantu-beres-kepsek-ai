@@ -1,3 +1,4 @@
+import { getUserGroqKey } from "../lib/user-ai-key.js";
 import { generateStructured } from "../lib/gemini.js";
 import { jsonBody, requireSchoolAccess, requireUser, sendError } from "../lib/supabase-auth.js";
 
@@ -18,7 +19,10 @@ export default async function handler(request, response) {
     if (!data || Buffer.byteLength(data, "base64") > maximum) {
       const error = new Error("File terlalu besar untuk dianalisis langsung."); error.status = 413; throw error;
     }
+    if (mimeType === "application/pdf") return response.status(200).json({text:"",summary:"PDF tersimpan. GroqCloud belum dapat membaca PDF mentah; unggah hasil ekstraksi teks atau gambar halaman untuk dianalisis.",metadata:{status:"stored",reason:"pdf-unsupported"}});
+    const userKey = await getUserGroqKey(token,user.id);
     const result = await generateStructured({
+      userKey,
       systemInstruction: `Anda membaca dokumen sekolah untuk membangun Memori Sekolah. Ekstrak fakta tanpa mengarang. Kembalikan JSON valid: {"summary":"ringkasan singkat","text":"teks/fakta penting yang dapat digunakan kembali","documentType":"jenis dokumen","schoolFacts":[{"field":"nama field","value":"nilai","confidence":"high|medium|low"}],"warnings":["data yang perlu diverifikasi"]}.`,
       seed: `${user.id}:${body.schoolId}:${name}`,
       maxOutputTokens: 4096,
