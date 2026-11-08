@@ -7,7 +7,10 @@ export default function handler(request, response) {
   const { url: supabaseUrl, key: supabasePublishableKey } = publicSupabaseSettings();
   response.status(200).json({
     configured: Boolean(supabaseUrl && supabasePublishableKey),
-    aiConfigured: keyCount() > 0,
+    aiConfigured: true,
+    platformAiConfigured: keyCount() > 0,
+    aiProvider: "groq",
+    aiModel: "automatic",
     supabaseUrl,
     supabasePublishableKey,
     maxInlineFileBytes: Number(process.env.MAX_INLINE_FILE_BYTES || 3_000_000),
