@@ -1,5 +1,5 @@
 import { deleteUserGroqKey, saveUserGroqKey, userKeyStatus } from "../lib/user-ai-key.js";
-import { testGroqKey } from "../lib/gemini.js";
+import { testGroqKey } from "../lib/groq.js";
 import { jsonBody, requireUser, sendError } from "../lib/supabase-auth.js";
 
 export default async function handler(request,response) {

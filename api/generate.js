@@ -1,4 +1,4 @@
-import { generateGroundedText, generateStructured } from "../lib/gemini.js";
+import { generateGroundedText, generateStructured } from "../lib/groq.js";
 import { blueprintFor, standardsContext, standardsFor, STANDARDS_VERIFIED_AT } from "../lib/education-standards.js";
 import { jsonBody, loadSchoolMemory, requireUser, sendError } from "../lib/supabase-auth.js";
 import { getUserGroqKey } from "../lib/user-ai-key.js";

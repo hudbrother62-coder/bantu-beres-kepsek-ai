@@ -1,4 +1,4 @@
-import { keyCount } from "../lib/gemini.js";
+import { keyCount } from "../lib/groq.js";
 import { publicSupabaseSettings } from "../lib/public-config.js";
 
 export default function handler(request, response) {

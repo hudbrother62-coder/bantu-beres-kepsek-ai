@@ -4,7 +4,7 @@ import configHandler from "../api/config.js";
 import healthHandler from "../api/health.js";
 import generateHandler from "../api/generate.js";
 import chatHandler from "../api/chat.js";
-import { generateConversation, generateGroundedText, generateStructured, keyCount } from "../lib/gemini.js";
+import { generateConversation, generateGroundedText, generateStructured, keyCount } from "../lib/groq.js";
 import { selectRelevantSources, validateGeneratedDocument } from "../api/generate.js";
 import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "../assets/document-format.js";
 import { standardsFor, STANDARDS_VERIFIED_AT } from "../lib/education-standards.js";
