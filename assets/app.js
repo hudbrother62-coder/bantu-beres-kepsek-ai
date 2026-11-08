@@ -265,7 +265,7 @@ function notificationStorageKey() {
 function loadNotifications() {
   try { state.notifications = JSON.parse(localStorage.getItem(notificationStorageKey()) || "[]"); } catch { state.notifications = []; }
   if (!state.notifications.length) {
-    state.notifications = [{ id:"welcome", title:"Workspace siap digunakan", text:"Gunakan menu Pengaturan AI untuk menambahkan API key Gemini pribadi bila kuota aplikasi sedang penuh.", time:new Date().toISOString(), read:false, route:"/settings" }];
+    state.notifications = [{ id:"welcome", title:"Workspace siap digunakan", text:"Gunakan menu Pengaturan AI untuk menambahkan API key GroqCloud pribadi bila kuota aplikasi sedang penuh. Model sekarang dipilih otomatis.", time:new Date().toISOString(), read:false, route:"/settings" }];
     saveNotifications();
   }
 }
@@ -524,7 +524,7 @@ function appShell(content, active = "dashboard", title = "Beranda Kepala Sekolah
       <header class="topbar">
         <div class="page-heading"><small>${new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date())}</small><strong>${escapeHtml(title)}</strong></div>
         <a class="mobile-brand" href="/dashboard" data-route>${brand(true)}</a>
-        <div class="top-actions"><a class="mobile-ai-settings ${active === "settings" ? "active" : ""}" href="/settings" data-route aria-label="Pengaturan AI dan API key Gemini" title="Pengaturan AI">${icon("settings")}<span>API Key</span></a><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn notification-trigger" data-notifications aria-label="Notifikasi" aria-expanded="false">${icon("bell")}<span class="notice-dot" ${unreadNotifications ? "" : "hidden"}></span></button>${notificationMarkup()}</div>
+        <div class="top-actions"><a class="mobile-ai-settings ${active === "settings" ? "active" : ""}" href="/settings" data-route aria-label="Pengaturan AI dan API key Groq" title="Pengaturan AI">${icon("settings")}<span>API Key</span></a><label class="global-search">${icon("search")}<input id="global-search" aria-label="Cari dokumen" placeholder="Cari dokumen atau fitur"></label><button class="btn btn-primary" data-new-document>${icon("sparkles")} ${state.config?.aiConfigured ? "Buat dengan AI" : "Pratinjau AI"}</button>${themeToggle(false)}<button class="icon-btn notification-trigger" data-notifications aria-label="Notifikasi" aria-expanded="false">${icon("bell")}<span class="notice-dot" ${unreadNotifications ? "" : "hidden"}></span></button>${notificationMarkup()}</div>
       </header>
       <main id="main-content" class="content">${content}</main>
       <nav class="mobile-bottom" aria-label="Navigasi mobile">
@@ -783,14 +783,14 @@ function profileField(label, name, value, readonly = false, type = "text") {
 
 function renderSettings() {
   document.title = `Pengaturan AI — ${APP_NAME}`;
-  const providers = state.demo ? [{ provider:"gemini", key_hint:"AIza••••demo" }] : (state.userAiKeys || []);
-  const connected = providers.find((item) => item.provider === "gemini");
+  const providers = state.demo ? [{ provider:"groq", key_hint:"AIza••••demo" }] : (state.userAiKeys || []);
+  const connected = providers.find((item) => item.provider === "groq");
   const content = `<div class="page-intro"><div><span class="page-kicker">Kendali akun</span><h1>Pengaturan AI</h1><p>API key aplikasi dipakai bersama oleh semua akun. Key pribadi ini hanya menjadi cadangan untuk akun Anda saat kuota bersama habis.</p></div></div>
-    <section class="panel byok-panel"><div class="byok-grid"><div><div class="panel-head"><div><h2>Cadangan API key Gemini</h2><p>Masukkan key Gemini milik akun Anda agar tetap dapat bekerja ketika key aplikasi sedang terkena batas penggunaan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Cadangan aktif" : "Belum diatur"}</span></div>
+    <section class="panel byok-panel"><div class="byok-grid"><div><div class="panel-head"><div><h2>Cadangan API key Groq</h2><p class="field-hint">PEMBARUAN 8 NOVEMBER 2026: AI kini menggunakan GroqCloud dan memilih model secara otomatis. API key Gemini lama perlu diganti dengan key GroqCloud (gsk_...).</p><p>Masukkan key Groq milik akun Anda agar tetap dapat bekerja ketika key aplikasi sedang terkena batas penggunaan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Cadangan aktif" : "Belum diatur"}</span></div>
       <div class="notice-box">${icon("shield-check")}<span><strong>Aman dan khusus akun ini</strong><small>Key disimpan terenkripsi di server dan tidak dapat dilihat oleh kepala sekolah, guru lain, atau browser.</small></span></div>
-      <form id="user-ai-key-form"><div class="form-group"><label for="user-gemini-key">Gemini API key pribadi</label><div class="key-input-wrap"><input class="form-control" id="user-gemini-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Tempel API key Gemini di sini"><button type="button" class="icon-btn key-visibility" data-toggle-user-key aria-label="Tampilkan API key">${icon("eye")}</button></div><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Masukkan key baru untuk menggantinya.` : "Key ini hanya digunakan sebagai cadangan untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("plug")} Simpan & uji koneksi</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key cadangan</button>` : ""}</div></form></div>
-      <div class="video-tutorial"><div class="video-title">${icon("video")}<strong>Video tutorial cara memasukkan API key</strong></div><div class="video-frame"><iframe src="https://www.youtube.com/embed/mUTAq9ffk0s" title="Tutorial memasukkan API key Gemini" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><a class="video-link" href="https://youtu.be/mUTAq9ffk0s" target="_blank" rel="noopener noreferrer">Buka video di YouTube ${icon("external-link")}</a></div></div>
-      <details class="tutorial-details" open><summary>${icon("book-open-check")} Tutorial tertulis: cara memasukkan API key Gemini</summary><div class="tutorial-columns"><div><h3>1. Dapatkan API key</h3><ol><li>Buka <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio → API Keys</a>.</li><li>Masuk memakai akun Google Anda.</li><li>Pilih Create API key, lalu pilih atau buat project bila diminta.</li><li>Salin key yang diberikan Google. Jangan membagikannya kepada orang lain.</li></ol></div><div><h3>2. Masukkan ke Bantu Beres</h3><ol start="5"><li>Kembali ke halaman ini dan tempel key pada kolom di atas.</li><li>Pilih Simpan & uji koneksi.</li><li>Jika berhasil, status berubah menjadi Cadangan aktif.</li><li>Key pribadi baru dipakai ketika seluruh key aplikasi bersama tidak tersedia.</li></ol></div></div><p class="field-hint">Jangan masukkan API key ke chat, source code, GitHub, atau dokumen yang dibagikan. Video di atas adalah panduan yang dapat diputar langsung dari halaman ini.</p></details></section>`;
+      <form id="user-ai-key-form"><div class="form-group"><label for="user-groq-key">Groq API key pribadi</label><div class="key-input-wrap"><input class="form-control" id="user-groq-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Tempel API key Groq di sini"><button type="button" class="icon-btn key-visibility" data-toggle-user-key aria-label="Tampilkan API key">${icon("eye")}</button></div><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Masukkan key baru untuk menggantinya.` : "Key ini hanya digunakan sebagai cadangan untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("plug")} Simpan & uji koneksi</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key cadangan</button>` : ""}</div></form></div>
+      <div class="video-tutorial"><div class="video-title">${icon("book-open-check")}<strong>Petunjuk GroqCloud</strong></div><p>Video Gemini lama sudah diganti dengan tutorial GroqCloud tertulis di bawah. Buat API key pada halaman resmi GroqCloud lalu tempel key berawalan gsk_.</p><a class="video-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Buka GroqCloud Console ${icon("external-link")}</a></div></div>
+      <details class="tutorial-details" open><summary>${icon("book-open-check")} Tutorial tertulis: cara memasukkan API key Groq</summary><div class="tutorial-columns"><div><h3>1. Dapatkan API key</h3><ol><li>Buka <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">GroqCloud → API Keys</a>.</li><li>Daftar atau masuk ke akun GroqCloud Anda.</li><li>Tekan Create API Key, beri nama key, lalu buat key baru.</li><li>Salin key GroqCloud yang diawali gsk_. Jangan membagikannya kepada orang lain.</li></ol></div><div><h3>2. Masukkan ke Bantu Beres</h3><ol start="5"><li>Kembali ke halaman ini dan tempel key pada kolom di atas.</li><li>Pilih Simpan & uji koneksi.</li><li>Jika berhasil, status berubah menjadi Cadangan aktif.</li><li>Key pribadi baru dipakai ketika seluruh key aplikasi bersama tidak tersedia. Model dipilih otomatis sesuai daftar model pada akun Groq Anda.</li></ol></div></div><p class="field-hint">Jangan masukkan API key ke chat, source code, GitHub, atau dokumen yang dibagikan. Video di atas adalah panduan yang dapat diputar langsung dari halaman ini.</p></details></section>`;
   app.innerHTML = appShell(content,"settings","Pengaturan AI");
 }
 
@@ -1149,7 +1149,7 @@ function renderGuide() {
 
 function renderMore() {
   const items = [
-    ["settings","Pengaturan AI","Masukkan dan kelola API key Gemini pribadi sebagai cadangan.","/settings"],
+    ["settings","Pengaturan AI","Masukkan dan kelola API key Groq pribadi sebagai cadangan.","/settings"],
     ["sparkles","Fitur AI","KSP, PBD, RKJM, RKT, RKAS, kegiatan, SOP, dan kinerja.","/ai"],
     ["database","Profil & Memori","Data utama dan dokumen sumber sekolah.","/profile"],
     ["users","Tim Sekolah","Akses penuh untuk orang yang membantu.","/team"],
@@ -1224,7 +1224,7 @@ function renderAssistant() {
       ${messages.length ? messages.map(assistantMessage).join("") : empty}
       ${state.assistantSending ? `<article class="assistant-message assistant"><span class="assistant-avatar">${icon("brain-circuit")}</span><div class="assistant-bubble assistant-typing"><span></span><span></span><span></span><small>Asisten sedang berpikir…</small></div></article>` : ""}
     </div>
-    ${aiEnabled ? `<form class="assistant-composer" id="assistant-form"><textarea name="message" id="assistant-input" rows="1" maxlength="6000" placeholder="Tulis pesan untuk Asisten AI…" aria-label="Pesan untuk Asisten AI" ${state.assistantSending ? "disabled" : ""}>${escapeHtml(state.assistantDraft || "")}</textarea><div class="assistant-compose-foot"><small>Enter untuk kirim • Shift+Enter untuk baris baru</small><button class="btn btn-primary" type="submit" ${state.assistantSending ? "disabled" : ""}>${icon("arrow-up-right")} <span>Kirim</span></button></div></form>` : `<div class="assistant-offline">${icon("circle-alert")}<span><strong>AI belum terhubung</strong><small>Periksa Environment Variables Gemini di Vercel, kemudian redeploy.</small></span></div>`}
+    ${aiEnabled ? `<form class="assistant-composer" id="assistant-form"><textarea name="message" id="assistant-input" rows="1" maxlength="6000" placeholder="Tulis pesan untuk Asisten AI…" aria-label="Pesan untuk Asisten AI" ${state.assistantSending ? "disabled" : ""}>${escapeHtml(state.assistantDraft || "")}</textarea><div class="assistant-compose-foot"><small>Enter untuk kirim • Shift+Enter untuk baris baru</small><button class="btn btn-primary" type="submit" ${state.assistantSending ? "disabled" : ""}>${icon("arrow-up-right")} <span>Kirim</span></button></div></form>` : `<div class="assistant-offline">${icon("circle-alert")}<span><strong>AI belum terhubung</strong><small>Periksa Environment Variables Groq di Vercel, kemudian redeploy.</small></span></div>`}
   </section>`;
   app.innerHTML = appShell(content, "assistant", "Asisten AI");
   requestAnimationFrame(() => {
@@ -1645,12 +1645,12 @@ async function handleUserAiKeySave(event) {
     const session = await activeSession(); if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
     const response = await fetch("/api/user-ai-key", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ apiKey }) });
     const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat disimpan.");
-    state.userAiKeys = [{ provider:"gemini", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; addNotification("API key Gemini tersimpan", "Key pribadi ini hanya dipakai sebagai cadangan untuk akun Anda.", "/settings"); toast("API key Gemini tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
+    state.userAiKeys = [{ provider:"groq", key_hint:result.keyHint, updated_at:new Date().toISOString() }]; state.userAiKeysLoaded = true; addNotification("API key Groq tersimpan", "Key pribadi ini hanya dipakai sebagai cadangan untuk akun Anda.", "/settings"); toast("API key Groq tersimpan aman untuk akun ini"); renderSettings(); bindPageEvents();
   } catch (cause) { errorBox.textContent = humanError(cause); errorBox.hidden = false; } finally { submit.disabled = false; }
 }
 
 function toggleUserKeyVisibility() {
-  const input = app.querySelector("#user-gemini-key");
+  const input = app.querySelector("#user-groq-key");
   const button = app.querySelector("[data-toggle-user-key]");
   if (!input || !button) return;
   const showing = input.type === "text";
@@ -1660,8 +1660,8 @@ function toggleUserKeyVisibility() {
 }
 
 async function removeUserAiKey() {
-  if (!confirm("Hapus API key Gemini pribadi dari akun ini?")) return;
-  try { const session = await activeSession(); const response = await fetch("/api/user-ai-key", { method:"DELETE", headers:{ Authorization:`Bearer ${session.access_token}` } }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat dihapus."); state.userAiKeys = []; addNotification("API key Gemini dihapus", "AI kembali menggunakan key aplikasi bersama untuk akun Anda.", "/settings"); toast("API key pribadi dihapus"); renderSettings(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); }
+  if (!confirm("Hapus API key Groq pribadi dari akun ini?")) return;
+  try { const session = await activeSession(); const response = await fetch("/api/user-ai-key", { method:"DELETE", headers:{ Authorization:`Bearer ${session.access_token}` } }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || "API key belum dapat dihapus."); state.userAiKeys = []; addNotification("API key Groq dihapus", "AI kembali menggunakan key aplikasi bersama untuk akun Anda.", "/settings"); toast("API key pribadi dihapus"); renderSettings(); bindPageEvents(); } catch (cause) { toast(humanError(cause),"error"); }
 }
 
 async function handleFiles(files) {
@@ -1736,7 +1736,7 @@ async function submitAssistantMessage(message) {
   const content = String(message || "").trim();
   if (state.assistantSending || content.length < 2) return;
   if (!state.config?.aiConfigured) {
-    toast("AI belum terhubung. Periksa konfigurasi Gemini di Vercel.", "error");
+    toast("AI belum terhubung. Periksa konfigurasi Groq di Vercel.", "error");
     return;
   }
   const previousHistory = state.assistantMessages.filter((item) => !item.failed).slice(-16);
