@@ -1,7 +1,7 @@
 import { generateGroundedText, generateStructured } from "../lib/gemini.js";
 import { blueprintFor, standardsContext, standardsFor, STANDARDS_VERIFIED_AT } from "../lib/education-standards.js";
 import { jsonBody, loadSchoolMemory, requireUser, sendError } from "../lib/supabase-auth.js";
-import { getUserGeminiKey } from "../lib/user-ai-key.js";
+import { getUserGroqKey } from "../lib/user-ai-key.js";
 
 export const config = { maxDuration: 300 };
 
@@ -292,7 +292,7 @@ export default async function handler(request, response) {
     if (prompt.length < 10 || prompt.length > 16_000) { const error = new Error("Instruksi harus terdiri dari 10 sampai 16.000 karakter."); error.status = 400; throw error; }
 
     const { school, sources: allSources } = await loadSchoolMemory(token, user.id, schoolId, 24);
-    const userKey = await getUserGeminiKey(token, user.id);
+    const userKey = await getUserGroqKey(token, user.id);
     const sources = selectRelevantSources(allSources, type, 14, templateSourceId);
     const seed = `${user.id}:${school.id}:${type}`;
     const [plan, standards] = await Promise.all([createPlan({ type, prompt, school, sources, seed, templateSourceId, userKey }), currentStandards(type, userKey)]);
