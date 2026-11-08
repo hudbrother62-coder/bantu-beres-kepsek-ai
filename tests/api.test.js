@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import configHandler from "../api/config.js";
 import healthHandler from "../api/health.js";
 import generateHandler from "../api/generate.js";
@@ -171,4 +172,13 @@ test("assistant formatter escapes model HTML and keeps arithmetic stars", () => 
   assert.match(rendered, /2 \* 3 = 6/);
   assert.doesNotMatch(rendered, /<script>/);
   assert.match(rendered, /&lt;script&gt;/);
+});
+
+
+test("Kepsek AI includes the requested GroqCloud video tutorial with automatic model selection", () => {
+  const src=readFileSync(new URL("../assets/app.js", import.meta.url),"utf8");
+  assert.match(src,/youtube\.com\/embed\/WBX9Yvk4eKs/);
+  assert.match(src,/youtu\.be\/WBX9Yvk4eKs/);
+  assert.match(src,/update-groq-video-20261109/);
+  assert.match(src,/allowfullscreen/);
 });
