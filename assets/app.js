@@ -548,7 +548,7 @@ function renderDashboard() {
   const upcomingAgendas = currentAgendas().filter((agenda) => new Date(agenda.starts_at) >= startOfToday()).slice(0,3);
   const timeline = todayAgendas.length ? todayAgendas.map((agenda) => agendaTimelineItem(agenda)).join("") : `<div class="agenda-empty compact"><span class="empty-icon">${icon("calendar-days")}</span><strong>Belum ada agenda hari ini</strong><small>Tambahkan kegiatan agar rundown harian tersusun.</small><button class="btn btn-secondary" data-add-agenda data-date="${todayKey}">${icon("plus")} Tambah agenda</button></div>`;
   const priorityRows = upcomingAgendas.length ? upcomingAgendas.map((agenda) => priorityAgendaItem(agenda)).join("") : `<button class="priority" data-add-agenda data-date="${todayKey}"><span class="priority-icon tone-blue">${icon("calendar-days")}</span><span><strong>Susun agenda pertama</strong><small>Tambahkan rapat, supervisi, atau kegiatan sekolah.</small></span><span class="priority-time">Tambah</span></button>`;
-  const aiEnabled = Boolean(state.config?.aiConfigured);
+  const aiEnabled = Boolean(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'));
   document.title = `Beranda — ${APP_NAME}`;
   const content = `<section class="command-hero">
     <div class="welcome-row"><div class="welcome"><small>Selamat datang, ${escapeHtml(principal)} 👋</small><h1>Siap membantu pekerjaan sekolah hari ini.</h1><p>Ada ${docs.filter((doc) => doc.status !== "approved").length || 3} dokumen yang masih perlu ditinjau.</p></div><div class="completion"><div class="completion-ring" style="--completion:${completion}%"><span>${completion}%</span></div><div><small>Kelengkapan workspace</small><strong>${completion >= 80 ? "Sudah baik" : "Hampir siap"}</strong></div></div></div>
@@ -783,10 +783,10 @@ function profileField(label, name, value, readonly = false, type = "text") {
 
 function renderSettings() {
   document.title = `Pengaturan AI — ${APP_NAME}`;
-  const providers = state.demo ? [{ provider:"groq", key_hint:"AIza••••demo" }] : (state.userAiKeys || []);
+  const providers = state.demo ? [{ provider:"groq", key_hint:"gsk_••••demo" }] : (state.userAiKeys || []);
   const connected = providers.find((item) => item.provider === "groq");
   const content = `<div class="page-intro"><div><span class="page-kicker">Kendali akun</span><h1>Pengaturan AI</h1><p>API key aplikasi dipakai bersama oleh semua akun. Key pribadi ini hanya menjadi cadangan untuk akun Anda saat kuota bersama habis.</p></div></div>
-    <section class="panel byok-panel"><div class="byok-grid"><div><div class="panel-head"><div><h2>Cadangan API key Groq</h2><p class="field-hint">PEMBARUAN 8 NOVEMBER 2026: AI kini menggunakan GroqCloud dan memilih model secara otomatis. API key Gemini lama perlu diganti dengan key GroqCloud (gsk_...).</p><p>Masukkan key Groq milik akun Anda agar tetap dapat bekerja ketika key aplikasi sedang terkena batas penggunaan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Cadangan aktif" : "Belum diatur"}</span></div>
+    <section class="panel byok-panel"><div class="byok-grid"><div><div class="panel-head"><div><h2>Cadangan API key Groq</h2><p class="field-hint">PEMBARUAN 8 NOVEMBER 2026: AI kini menggunakan GroqCloud dan memilih model secara otomatis. API key Google lama perlu diganti dengan key GroqCloud (gsk_...).</p><p>Masukkan key Groq milik akun Anda agar tetap dapat bekerja ketika key aplikasi sedang terkena batas penggunaan.</p></div><span class="badge ${connected ? "badge-green" : "badge-neutral"}">${connected ? "Cadangan aktif" : "Belum diatur"}</span></div>
       <div class="notice-box">${icon("shield-check")}<span><strong>Aman dan khusus akun ini</strong><small>Key disimpan terenkripsi di server dan tidak dapat dilihat oleh kepala sekolah, guru lain, atau browser.</small></span></div>
       <form id="user-ai-key-form"><div class="form-group"><label for="user-groq-key">Groq API key pribadi</label><div class="key-input-wrap"><input class="form-control" id="user-groq-key" name="apiKey" type="password" autocomplete="new-password" placeholder="Tempel API key Groq di sini"><button type="button" class="icon-btn key-visibility" data-toggle-user-key aria-label="Tampilkan API key">${icon("eye")}</button></div><small class="field-hint">${connected ? `Key tersimpan: ${escapeHtml(connected.key_hint)}. Masukkan key baru untuk menggantinya.` : "Key ini hanya digunakan sebagai cadangan untuk akun Anda."}</small></div><div id="user-ai-key-error" class="form-error" hidden></div><div class="panel-actions"><button class="btn btn-primary" type="submit">${icon("plug")} Simpan & uji koneksi</button>${connected && !state.demo ? `<button class="btn btn-danger" type="button" data-remove-user-ai-key>Hapus key cadangan</button>` : ""}</div></form></div>
       <div class="video-tutorial"><div class="video-title">${icon("book-open-check")}<strong>Petunjuk GroqCloud</strong></div><p>Video Gemini lama sudah diganti dengan tutorial GroqCloud tertulis di bawah. Buat API key pada halaman resmi GroqCloud lalu tempel key berawalan gsk_.</p><a class="video-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Buka GroqCloud Console ${icon("external-link")}</a></div></div>
@@ -1208,7 +1208,7 @@ function assistantMessage(message) {
 
 function renderAssistant() {
   const school = state.school || demoSchool;
-  const aiEnabled = Boolean(state.config?.aiConfigured);
+  const aiEnabled = Boolean(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'));
   const messages = state.assistantMessages || [];
   const memoryCount = 1 + state.sources.length;
   document.title = `Asisten AI — ${APP_NAME}`;
@@ -1239,7 +1239,7 @@ function renderAi() {
   const requestedType = params.get("type");
   if (requestedType && aiTypes[requestedType]) state.aiType = requestedType;
   const type = aiTypes[state.aiType] || aiTypes.ksp;
-  const aiEnabled = Boolean(state.config?.aiConfigured);
+  const aiEnabled = Boolean(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'));
   const sources = state.sources.length ? state.sources : demoSources;
   const templateOptions = sources
     .filter((source) => source.status === "ready" || source.extracted_text)
@@ -1676,7 +1676,7 @@ async function handleFiles(files) {
         const { error: uploadError } = await state.supabase.storage.from("kepsek-school-files").upload(path,file,{ upsert:false, contentType:file.type });
         if (uploadError) throw uploadError;
         let extractedText = ""; let summary = state.config?.aiConfigured ? "Dokumen tersimpan dan siap digunakan" : "Dokumen tersimpan. Analisis AI belum diaktifkan.";
-        if (state.config?.aiConfigured && file.size <= Number(state.config.maxInlineFileBytes || 3000000)) {
+        if ((state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq')) && file.size <= Number(state.config.maxInlineFileBytes || 3000000)) {
           const analysis = await analyzeUploadedFile(file);
           extractedText = analysis.text || ""; summary = analysis.summary || summary;
           source.status = analysis.text ? "ready" : "stored";
@@ -1735,7 +1735,7 @@ async function handleAssistantSubmit(event) {
 async function submitAssistantMessage(message) {
   const content = String(message || "").trim();
   if (state.assistantSending || content.length < 2) return;
-  if (!state.config?.aiConfigured) {
+  if (!(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'))) {
     toast("AI belum terhubung. Periksa konfigurasi Groq di Vercel.", "error");
     return;
   }
@@ -1810,7 +1810,7 @@ async function clearAssistantHistory() {
 
 async function handleGenerate(event) {
   event.preventDefault();
-  if (!state.config?.aiConfigured) {
+  if (!(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'))) {
     toast("Fitur AI belum diaktifkan pada versi ini.", "error");
     return;
   }
@@ -2154,8 +2154,8 @@ window.addEventListener("visibilitychange", async () => {
   if (document.visibilityState !== "visible") return;
   await handleSessionActivity();
   if (Date.now() - state.configUpdatedAt < 30_000) return;
-  const wasEnabled = Boolean(state.config?.aiConfigured);
+  const wasEnabled = Boolean(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq'));
   await refreshConfig();
-  if (wasEnabled !== Boolean(state.config?.aiConfigured) && !["landing","auth"].includes(currentRoute())) await route({ preserveScroll:true });
+  if (wasEnabled !== Boolean(state.config?.aiConfigured || (state.userAiKeys || []).some(item => item.provider === 'groq')) && !["landing","auth"].includes(currentRoute())) await route({ preserveScroll:true });
 });
 init();
