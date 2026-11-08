@@ -1,4 +1,4 @@
-import { generateStructured } from "../lib/gemini.js";
+import { generateStructured } from "../lib/groq.js";
 import { jsonBody, requireSchoolAccess, requireUser, sendError } from "../lib/supabase-auth.js";
 
 const supportedMime = new Set(["application/pdf", "text/plain", "text/csv", "image/jpeg", "image/png", "image/webp"]);
