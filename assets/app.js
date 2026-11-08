@@ -268,8 +268,9 @@ function loadNotifications() {
     state.notifications = [{ id:"welcome", title:"Workspace siap digunakan", text:"Gunakan menu Pengaturan AI untuk menambahkan API key GroqCloud pribadi bila kuota aplikasi sedang penuh. Model sekarang dipilih otomatis.", time:new Date().toISOString(), read:false, route:"/settings" }];
     saveNotifications();
   }
-  if (!state.notifications.some(item => item.id === "update-groq-20261108")) {
-    state.notifications.unshift({ id: "update-groq-20261108", title: "Pembaruan AI: GroqCloud", text: "AI sekarang menggunakan GroqCloud dengan pemilihan model otomatis. Key Gemini lama tidak dipakai; buka Pengaturan AI dan buat key GroqCloud (gsk_...) jika diperlukan.", time: new Date().toISOString(), read: false, route: "/settings" });
+  state.notifications = state.notifications.filter(item => item.id !== "update-groq-20261108");
+  if (!state.notifications.some(item => item.id === "update-groq-video-20261109")) {
+    state.notifications.unshift({ id: "update-groq-video-20261109", title: "Video tutorial GroqCloud tersedia", text: "Sekarang tersedia video cara membuat dan memasukkan API key GroqCloud di Pengaturan AI. Key harus berawalan gsk_ dan model AI dipilih otomatis.", time: new Date().toISOString(), read: false, route: "/settings" });
     saveNotifications();
   }
 }
