@@ -1,5 +1,5 @@
-import { generateConversation } from "../lib/gemini.js";
-import { getUserGeminiKey } from "../lib/user-ai-key.js";
+import { generateConversation } from "../lib/groq.js";
+import { getUserGroqKey } from "../lib/user-ai-key.js";
 import { jsonBody, loadSchoolMemory, requireUser, sendError } from "../lib/supabase-auth.js";
 
 function memoryText(school, sources) {
