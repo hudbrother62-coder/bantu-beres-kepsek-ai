@@ -1,4 +1,4 @@
-import { keyCount } from "../lib/gemini.js";
+import { keyCount } from "../lib/groq.js";
 import { publicSupabaseSettings } from "../lib/public-config.js";
 
 export default function handler(request, response) {
@@ -8,6 +8,8 @@ export default function handler(request, response) {
   response.status(200).json({
     configured: Boolean(supabaseUrl && supabasePublishableKey),
     aiConfigured: keyCount() > 0,
+    aiProvider: "groq",
+    aiModelSelection: "automatic",
     supabaseUrl,
     supabasePublishableKey,
     maxInlineFileBytes: Number(process.env.MAX_INLINE_FILE_BYTES || 3_000_000),
