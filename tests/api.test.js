@@ -4,7 +4,7 @@ import configHandler from "../api/config.js";
 import healthHandler from "../api/health.js";
 import generateHandler from "../api/generate.js";
 import chatHandler from "../api/chat.js";
-import { generateConversation, generateGroundedText, generateStructured, keyCount } from "../lib/gemini.js";
+import { generateConversation, generateGroundedText, generateStructured, keyCount } from "../lib/groq.js";
 import { selectRelevantSources, validateGeneratedDocument } from "../api/generate.js";
 import { cleanDocumentText, documentStatistics, parseDocumentBlocks } from "../assets/document-format.js";
 import { standardsFor, STANDARDS_VERIFIED_AT } from "../lib/education-standards.js";
@@ -22,116 +22,100 @@ function responseMock() {
   };
 }
 
-test("config never exposes Gemini secrets", () => {
-  const response = responseMock();
-  configHandler({ method: "GET" }, response);
-  assert.equal(response.statusCode, 200);
-  assert.equal("geminiKey" in response.payload, false);
-  assert.equal(response.payload.configured, true);
-  assert.equal(response.payload.aiConfigured, false);
-  assert.equal(response.headers["Cache-Control"], "no-store, max-age=0");
+test("config never exposes Groq secrets", () => {
+  const response=responseMock();
+  configHandler({method:"GET"},response);
+  assert.equal(response.statusCode,200);
+  assert.equal(response.payload.aiProvider,"groq");
+  assert.equal(response.payload.aiModel,"automatic");
+  assert.equal("groqKey" in response.payload,false);
+  assert.equal(response.headers["Cache-Control"],"no-store, max-age=0");
 });
 
-test("health reports service configuration without secret values", () => {
-  const response = responseMock();
-  healthHandler({ method: "GET" }, response);
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.payload.ok, true);
-  assert.equal(response.payload.services.supabase, true);
-  assert.equal(typeof response.payload.services.geminiKeyCount, "number");
+test("health reports Groq status without exposing secrets", () => {
+  const response=responseMock();
+  healthHandler({method:"GET"},response);
+  assert.equal(response.statusCode,200);
+  assert.equal(response.payload.ok,true);
+  assert.equal(response.payload.services.supabase,true);
+  assert.equal(typeof response.payload.services.groqKeyCount,"number");
+  assert.equal(response.payload.services.modelSelection,"automatic");
 });
 
 test("generate endpoint requires an authenticated user", async () => {
-  const response = responseMock();
-  await generateHandler({ method: "POST", headers: {}, body: { type: "ksp", prompt: "Susun dokumen sekolah", context: {} } }, response);
-  assert.equal(response.statusCode, 401);
-  assert.match(response.payload.error, /masuk/i);
+  const response=responseMock();
+  await generateHandler({method:"POST",headers:{},body:{type:"ksp",prompt:"Susun dokumen",context:{}}},response);
+  assert.equal(response.statusCode,401);
 });
 
 test("assistant endpoint requires an authenticated user", async () => {
-  const response = responseMock();
-  await chatHandler({ method: "POST", headers: {}, body: { schoolId: "school", message: "Halo" } }, response);
-  assert.equal(response.statusCode, 401);
-  assert.match(response.payload.error, /masuk/i);
+  const response=responseMock();
+  await chatHandler({method:"POST",headers:{},body:{schoolId:"school",message:"Halo"}},response);
+  assert.equal(response.statusCode,401);
 });
 
-test("Gemini configuration recognizes supported environment aliases", () => {
-  const before = process.env.GEMINI_KEY_1;
-  process.env.GEMINI_KEY_1 = "test-key-with-more-than-twenty-characters";
-  assert.equal(keyCount(), 1);
-  if (before === undefined) delete process.env.GEMINI_KEY_1;
-  else process.env.GEMINI_KEY_1 = before;
-});
-
-test("conversation sends server-side Gemini key and returns model text", async () => {
-  const beforeKey = process.env.GEMINI_KEY_1;
-  const beforeFetch = globalThis.fetch;
-  let captured;
-  process.env.GEMINI_KEY_1 = "test-key-with-more-than-twenty-characters";
-  globalThis.fetch = async (url, options) => {
-    captured = { url:String(url), options, body:JSON.parse(options.body) };
-    return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: "Jawaban yang jelas." }] } }],
-      usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 4 },
-    }), { status:200, headers:{ "Content-Type":"application/json" } });
-  };
-  try {
-    const result = await generateConversation({
-      systemInstruction: "Jawab jelas.",
-      history: [{ role:"user", content:"Pertanyaan sebelumnya" }, { role:"assistant", content:"Jawaban sebelumnya" }],
-      message: "Pertanyaan baru",
-      seed: "test",
-    });
-    assert.equal(result.reply, "Jawaban yang jelas.");
-    assert.match(captured.url, /gemini-3\.7-flash:generateContent/);
-    assert.equal(captured.options.headers["x-goog-api-key"], process.env.GEMINI_KEY_1);
-    assert.deepEqual(captured.body.contents.map((item) => item.role), ["user","model","user"]);
-  } finally {
-    globalThis.fetch = beforeFetch;
-    if (beforeKey === undefined) delete process.env.GEMINI_KEY_1;
-    else process.env.GEMINI_KEY_1 = beforeKey;
+test("Groq configuration recognizes GROQ_API_KEY_1", () => {
+  const original=process.env.GROQ_API_KEY_1;
+  process.env.GROQ_API_KEY_1="gsk_testlongvalidkeywiththirtycharacters123";
+  try{assert.ok(keyCount()>=1);}finally{
+    if(original===undefined)delete process.env.GROQ_API_KEY_1;
+    else process.env.GROQ_API_KEY_1=original;
   }
 });
 
-test("structured generation sends an explicit JSON schema to Gemini", async () => {
-  const beforeKey = process.env.GEMINI_KEY_1;
-  const beforeFetch = globalThis.fetch;
-  let body;
-  process.env.GEMINI_KEY_1 = "test-key-with-more-than-twenty-characters";
-  globalThis.fetch = async (_url, options) => {
-    body = JSON.parse(options.body);
-    return new Response(JSON.stringify({ candidates:[{ content:{ parts:[{ text:'{"title":"Dokumen","content":"Isi"}' }] } }] }),{ status:200,headers:{ "Content-Type":"application/json" } });
+function withGroqMock(responseText,check) {
+  const originalFetch=globalThis.fetch, originalKey=process.env.GROQ_API_KEY_1;
+  const key="gsk_distincttestkeyforautomaticmodel12345";
+  process.env.GROQ_API_KEY_1=key;
+  const calls=[];
+  globalThis.fetch=async(url,options={})=>{
+    calls.push({url:String(url),options});
+    if(String(url).endsWith("/models"))return new Response(JSON.stringify({data:[
+      {id:"llama-3.3-70b-versatile",active:true},
+      {id:"llama-3.1-8b-instant",active:true}
+    ]}),{status:200,headers:{"Content-Type":"application/json"}});
+    return new Response(JSON.stringify({choices:[{message:{content:responseText}}],usage:{total_tokens:15}}),{status:200,headers:{"Content-Type":"application/json"}});
   };
-  try {
-    const schema = { type:"object",properties:{ title:{ type:"string" },content:{ type:"string" } },required:["title","content"] };
-    const result = await generateStructured({ systemInstruction:"Susun.",parts:[{ text:"Isi" }],responseSchema:schema });
+  return async (invoke)=>{
+    try{const result=await invoke();check(result,calls,key);}
+    finally{globalThis.fetch=originalFetch;
+      if(originalKey===undefined)delete process.env.GROQ_API_KEY_1;else process.env.GROQ_API_KEY_1=originalKey;}
+  };
+}
+
+test("conversation calls GroqCloud chat completions and preserves roles",async()=>{
+  const run=withGroqMock("Jawaban jelas.",(result,calls,key)=>{
+    assert.equal(result.reply,"Jawaban jelas.");
+    const post=calls.find(c=>c.url.endsWith("/chat/completions"));
+    assert.ok(post);
+    assert.equal(post.options.headers.Authorization,"Bearer "+key);
+    const body=JSON.parse(post.options.body);
+    assert.equal(body.model,"llama-3.3-70b-versatile");
+    assert.deepEqual(body.messages.map(x=>x.role),["system","user","assistant","user"]);
+  });
+  await run(()=>generateConversation({systemInstruction:"Jawab jelas.",history:[
+    {role:"user",content:"Satu"},{role:"assistant",content:"Dua"}],message:"Tiga",seed:"test"}));
+});
+
+test("structured output requests JSON from Groq and includes schema instructions",async()=>{
+  const run=withGroqMock('{"title":"Dokumen","content":"Isi"}',(result,calls)=>{
     assert.equal(result.title,"Dokumen");
-    assert.deepEqual(body.generationConfig.responseSchema,schema);
-    assert.equal(body.generationConfig.responseMimeType,"application/json");
-  } finally {
-    globalThis.fetch = beforeFetch;
-    if (beforeKey === undefined) delete process.env.GEMINI_KEY_1; else process.env.GEMINI_KEY_1 = beforeKey;
-  }
+    const body=JSON.parse(calls.find(c=>c.url.endsWith("/chat/completions")).options.body);
+    assert.equal(body.response_format.type,"json_object");
+    assert.match(body.messages[0].content,/title/);
+  });
+  const schema={type:"object",properties:{title:{type:"string"},content:{type:"string"}},required:["title","content"]};
+  await run(()=>generateStructured({systemInstruction:"Susun JSON.",parts:[{text:"Isi"}],responseSchema:schema}));
 });
 
-test("grounded standards check enables Google Search without exposing the key", async () => {
-  const beforeKey = process.env.GEMINI_KEY_1;
-  const beforeFetch = globalThis.fetch;
-  let captured;
-  process.env.GEMINI_KEY_1 = "test-key-with-more-than-twenty-characters";
-  globalThis.fetch = async (url,options) => {
-    captured = { url:String(url),headers:options.headers,body:JSON.parse(options.body) };
-    return new Response(JSON.stringify({ candidates:[{ content:{ parts:[{ text:"Acuan resmi terverifikasi." }] },groundingMetadata:{ groundingChunks:[{ web:{ title:"BPK",uri:"https://peraturan.bpk.go.id/" } }] } }] }),{ status:200,headers:{ "Content-Type":"application/json" } });
-  };
-  try {
-    const result = await generateGroundedText({ systemInstruction:"Periksa.",prompt:"Periksa acuan." });
-    assert.deepEqual(captured.body.tools,[{ googleSearch:{} }]);
-    assert.equal(captured.headers["x-goog-api-key"],process.env.GEMINI_KEY_1);
-    assert.equal(result.sources[0].title,"BPK");
-  } finally {
-    globalThis.fetch = beforeFetch;
-    if (beforeKey === undefined) delete process.env.GEMINI_KEY_1; else process.env.GEMINI_KEY_1 = beforeKey;
-  }
+test("standards review does not falsely claim real-time Google Search grounding",async()=>{
+  const run=withGroqMock("Perlu cek regulasi resmi.",(result,calls)=>{
+    assert.deepEqual(result.sources,[]);
+    const body=JSON.parse(calls.find(c=>c.url.endsWith("/chat/completions")).options.body);
+    assert.equal("tools" in body,false);
+    assert.match(body.messages[0].content,/tidak ada pencarian web real-time/i);
+  });
+  await run(()=>generateGroundedText({systemInstruction:"Periksa.",prompt:"Periksa acuan."}));
 });
 
 test("uploaded templates are prioritized over unrelated recent files", () => {

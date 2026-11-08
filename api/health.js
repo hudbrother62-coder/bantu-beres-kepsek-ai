@@ -1,4 +1,4 @@
-import { keyCount } from "../lib/gemini.js";
+import { keyCount } from "../lib/groq.js";
 import { publicSupabaseSettings } from "../lib/public-config.js";
 
 export default function handler(request, response) {
@@ -10,10 +10,10 @@ export default function handler(request, response) {
     timestamp: new Date().toISOString(),
     services: {
       supabase: Boolean(url && key),
-      gemini: keyCount() > 0,
-      geminiKeyCount: keyCount(),
-      primaryModel: process.env.GEMINI_PRIMARY_MODEL || "gemini-3.7-flash",
-      fallbackModel: process.env.GEMINI_FALLBACK_MODEL || "gemini-3.5-flash-lite",
+      groq: keyCount() > 0,
+      groqKeyCount: keyCount(),
+      modelSelection: "automatic",
+
     },
   });
 }

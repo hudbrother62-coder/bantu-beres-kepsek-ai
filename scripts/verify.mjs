@@ -19,7 +19,7 @@ const required = [
   "api/generate.js",
   "api/chat.js",
   "api/analyze-file.js",
-  "lib/gemini.js",
+  "lib/groq.js",
   "lib/education-standards.js",
   "lib/supabase-auth.js",
   "lib/public-config.js",
@@ -34,7 +34,7 @@ const required = [
 
 for (const file of required) await access(resolve(root, file));
 
-for (const file of ["assets/app.js", "assets/document-format.js", "assets/session-policy.js", "assets/supervision-instruments.js", "api/config.js", "api/health.js", "api/generate.js", "api/chat.js", "api/analyze-file.js", "lib/gemini.js", "lib/education-standards.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
+for (const file of ["assets/app.js", "assets/document-format.js", "assets/session-policy.js", "assets/supervision-instruments.js", "api/config.js", "api/health.js", "api/generate.js", "api/chat.js", "api/analyze-file.js", "lib/groq.js", "lib/education-standards.js", "lib/public-config.js", "lib/supabase-auth.js"]) {
   const result = spawnSync(process.execPath, ["--check", resolve(root, file)], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${file}: ${result.stderr}`);
 }
