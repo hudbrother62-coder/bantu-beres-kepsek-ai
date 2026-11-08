@@ -1,4 +1,5 @@
 import { generateStructured } from "../lib/groq.js";
+import { getUserGroqKey } from "../lib/user-ai-key.js";
 import { jsonBody, requireSchoolAccess, requireUser, sendError } from "../lib/supabase-auth.js";
 
 const supportedMime = new Set(["application/pdf", "text/plain", "text/csv", "image/jpeg", "image/png", "image/webp"]);
@@ -14,11 +15,14 @@ export default async function handler(request, response) {
     const name = String(body.name || "dokumen");
     const mimeType = String(body.mimeType || "application/octet-stream");
     const data = String(body.data || "");
+    if (mimeType === "application/pdf") return response.status(200).json({ text: "", summary: "PDF berhasil disimpan. Analisis PDF memerlukan ekstraksi teks khusus dan belum tersedia melalui model Groq teks.", metadata: { status: "stored", provider: "groq" } });
     if (!supportedMime.has(mimeType)) return response.status(200).json({ text: "", summary: "File tersimpan. Ekstraksi otomatis untuk format ini belum tersedia.", metadata: { status: "stored" } });
     if (!data || Buffer.byteLength(data, "base64") > maximum) {
       const error = new Error("File terlalu besar untuk dianalisis langsung."); error.status = 413; throw error;
     }
+    const userKey = await getUserGroqKey(token, user.id);
     const result = await generateStructured({
+      userKey,
       systemInstruction: `Anda membaca dokumen sekolah untuk membangun Memori Sekolah. Ekstrak fakta tanpa mengarang. Kembalikan JSON valid: {"summary":"ringkasan singkat","text":"teks/fakta penting yang dapat digunakan kembali","documentType":"jenis dokumen","schoolFacts":[{"field":"nama field","value":"nilai","confidence":"high|medium|low"}],"warnings":["data yang perlu diverifikasi"]}.`,
       seed: `${user.id}:${body.schoolId}:${name}`,
       maxOutputTokens: 4096,
