@@ -26,7 +26,7 @@ export default async function handler(request, response) {
       systemInstruction: `Anda membaca dokumen sekolah untuk membangun Memori Sekolah. Ekstrak fakta tanpa mengarang. Kembalikan JSON valid: {"summary":"ringkasan singkat","text":"teks/fakta penting yang dapat digunakan kembali","documentType":"jenis dokumen","schoolFacts":[{"field":"nama field","value":"nilai","confidence":"high|medium|low"}],"warnings":["data yang perlu diverifikasi"]}.`,
       seed: `${user.id}:${body.schoolId}:${name}`,
       maxOutputTokens: 4096,
-      parts: [{ text: `Nama file: ${name}. Baca dokumen ini dan ekstrak fakta yang relevan bagi kepala sekolah.` }, { inlineData: { mimeType, data } }],
+      parts: [{ text: `Nama file: ${name}. Baca dokumen ini dan ekstrak fakta yang relevan bagi kepala sekolah.` }, ...(mimeType === "text/plain" || mimeType === "text/csv" ? [{ text: Buffer.from(data,"base64").toString("utf8").slice(0,200000) }] : [{ inlineData: { mimeType, data } }])],
     });
     response.status(200).json({ text: result.text || result.content || "", summary: result.summary || "Dokumen berhasil dianalisis", metadata: result.metadata, schoolFacts: result.schoolFacts || [], warnings: result.warnings || [] });
   } catch (cause) {
