@@ -1,7 +1,7 @@
 name: Groq Migration QA
 on:
   push:
-    branches: [main, feat/migrate-groq-kepsek-20261108]
+    branches: [main, feat/groq-video-WBX9Yvk4eKs-20261109]
   workflow_dispatch:
 permissions:
   contents: read
