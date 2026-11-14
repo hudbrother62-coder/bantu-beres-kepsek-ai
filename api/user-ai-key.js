@@ -1,1 +1,19 @@
-aW1wb3J0IHsgZGVsZXRlVXNlckdyb3FLZXksIGdldFVzZXJHcm9xS2V5LCBzYXZlVXNlckdyb3FLZXksIHVzZXJLZXlTdGF0dXMgfSBmcm9tICIuLi9saWIvdXNlci1haS1rZXkuanMiOwppbXBvcnQgeyB0ZXN0R3JvcUtleSB9IGZyb20gIi4uL2xpYi9ncm9xLmpzIjsKaW1wb3J0IHsganNvbkJvZHksIHJlcXVpcmVVc2VyLCBzZW5kRXJyb3IgfSBmcm9tICIuLi9saWIvc3VwYWJhc2UtYXV0aC5qcyI7CgpleHBvcnQgZGVmYXVsdCBhc3luYyBmdW5jdGlvbiBoYW5kbGVyKHJlcXVlc3QscmVzcG9uc2UpIHsKICByZXNwb25zZS5zZXRIZWFkZXIoIkNhY2hlLUNvbnRyb2wiLCJuby1zdG9yZSwgbWF4LWFnZT0wIik7CiAgdHJ5IHsKICAgIGNvbnN0IHt1c2VyLHRva2VufT1hd2FpdCByZXF1aXJlVXNlcihyZXF1ZXN0KTsKICAgIGlmKHJlcXVlc3QubWV0aG9kPT09IkdFVCIpcmV0dXJuIHJlc3BvbnNlLnN0YXR1cygyMDApLmpzb24oe3Byb3ZpZGVyczphd2FpdCB1c2VyS2V5U3RhdHVzKHRva2VuLHVzZXIuaWQpfSk7CiAgICBpZihyZXF1ZXN0Lm1ldGhvZD09PSJERUxFVEUiKXthd2FpdCBkZWxldGVVc2VyR3JvcUtleSh0b2tlbix1c2VyLmlkKTtyZXR1cm4gcmVzcG9uc2Uuc3RhdHVzKDIwMCkuanNvbih7b2s6dHJ1ZX0pO30KICAgIGlmKHJlcXVlc3QubWV0aG9kIT09IlBPU1QiKXJldHVybiByZXNwb25zZS5zdGF0dXMoNDA1KS5qc29uKHtlcnJvcjoiTWV0b2RlIHRpZGFrIGRpaXppbmthbi4ifSk7CiAgICBjb25zdCBib2R5PWpzb25Cb2R5KHJlcXVlc3QsMjAwMCk7CiAgICBjb25zdCB0ZXN0U3RvcmVkPWJvZHkudGVzdFN0b3JlZD09PXRydWU7CiAgICBjb25zdCBrZXk9dGVzdFN0b3JlZD9hd2FpdCBnZXRVc2VyR3JvcUtleSh0b2tlbix1c2VyLmlkKTpTdHJpbmcoYm9keS5hcGlLZXl8fCIiKS50cmltKCk7CiAgICBjb25zdCBzdGF0dXM9YXdhaXQgdGVzdEdyb3FLZXkoa2V5KTsKICAgIGlmKCF0ZXN0U3RvcmVkKWF3YWl0IHNhdmVVc2VyR3JvcUtleSh0b2tlbix1c2VyLmlkLGtleSk7CiAgICByZXR1cm4gcmVzcG9uc2Uuc3RhdHVzKDIwMCkuanNvbih7b2s6dHJ1ZSxwcm92aWRlcjoiZ3JvcSIsbW9kZWw6c3RhdHVzLm1vZGVsLG1vZGVsU2VsZWN0aW9uOiJhdXRvbWF0aWMiLGtleUhpbnQ6a2V5LnNsaWNlKDAsNCkrIuKAouKAouKAouKAoiIra2V5LnNsaWNlKC00KX0pOwogIH1jYXRjaChjYXVzZSl7cmV0dXJuIHNlbmRFcnJvcihyZXNwb25zZSxjYXVzZSk7fQp9Cg==
+import { deleteUserGroqKey, getUserGroqKey, saveUserGroqKey, userKeyStatus } from "../lib/user-ai-key.js";
+import { testGroqKey } from "../lib/groq.js";
+import { jsonBody, requireUser, sendError } from "../lib/supabase-auth.js";
+
+export default async function handler(request,response) {
+  response.setHeader("Cache-Control","no-store, max-age=0");
+  try {
+    const {user,token}=await requireUser(request);
+    if(request.method==="GET")return response.status(200).json({providers:await userKeyStatus(token,user.id)});
+    if(request.method==="DELETE"){await deleteUserGroqKey(token,user.id);return response.status(200).json({ok:true});}
+    if(request.method!=="POST")return response.status(405).json({error:"Metode tidak diizinkan."});
+    const body=jsonBody(request,2000);
+    const testStored=body.testStored===true;
+    const key=testStored?await getUserGroqKey(token,user.id):String(body.apiKey||"").trim();
+    const status=await testGroqKey(key);
+    if(!testStored)await saveUserGroqKey(token,user.id,key);
+    return response.status(200).json({ok:true,provider:"groq",model:status.model,modelSelection:"automatic",keyHint:key.slice(0,4)+"••••"+key.slice(-4)});
+  }catch(cause){return sendError(response,cause);}
+}
