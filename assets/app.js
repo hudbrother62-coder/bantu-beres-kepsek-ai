@@ -1267,6 +1267,7 @@ function renderAi() {
           </div>
           <div class="compose-actions"><div class="model-ready ${aiEnabled ? "" : "offline"}"><span></span>${aiEnabled ? "Siap menyusun dokumen lengkap" : "AI belum aktif"}</div><button class="btn btn-primary" type="submit" ${aiEnabled ? "" : "disabled"}>${icon(aiEnabled ? "sparkles" : "lock-keyhole")} ${aiEnabled ? "Susun dokumen lengkap" : "Segera tersedia"}</button></div>
         </form>
+        <div class="result-warning" id="ai-generate-error" role="alert" style="display:none"></div>
         <div class="generating" id="generating"><div class="ai-loader"><span class="ai-loader-icon">${icon("sparkles")}</span></div><h2>Sedang menyusun dokumen lengkap…</h2><p>Asisten memetakan template, membaca memori sekolah, memeriksa acuan resmi, lalu menguji mutu hasil.</p><div class="processing-list"><div class="processing-item"><span>✓</span>Membaca profil, memori, dan template</div><div class="processing-item"><span>✓</span>Memeriksa acuan pendidikan terkini</div><div class="processing-item"><span>•</span>Menyusun, menilai, dan memperbaiki hasil</div></div></div>
         <div class="generation-done" id="generation-done"><span class="done-icon">${icon("file-check-2")}</span><h2>Dokumen lengkap berhasil disusun</h2><p>Hasil sudah melewati pemeriksaan struktur, konsistensi, sumber, dan format. Kepala sekolah dapat meninjau, mengedit, lalu mengesahkannya.</p><div class="result-preview"><strong id="result-title">${escapeHtml(type.label)}</strong><small id="result-summary">Dokumen siap ditinjau dan diedit.</small></div><div id="result-details" class="result-details"></div><div class="result-actions"><button class="btn btn-secondary" id="generate-again">Susun ulang</button><button class="btn btn-primary" id="open-result">Buka hasil terformat ${icon("arrow-right")}</button></div></div>
       </section>
@@ -1822,6 +1823,8 @@ async function handleGenerate(event) {
   const form = event.currentTarget;
   const values = Object.fromEntries(new FormData(form));
   state.aiType = values.type;
+  const errorBanner = app.querySelector("#ai-generate-error");
+  if(errorBanner) errorBanner.style.display = "none";
   form.hidden = true;
   app.querySelector("#generating").classList.add("show");
   try {
@@ -1833,7 +1836,7 @@ async function handleGenerate(event) {
       if (!session) throw new Error("Sesi berakhir. Silakan masuk kembali.");
       const response = await fetch("/api/generate", { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${session.access_token}` }, body:JSON.stringify({ type:values.type, prompt:values.prompt, templateSourceId:values.templateSourceId || "", schoolId:state.school.id }) });
       result = await response.json();
-      if (!response.ok) throw new Error(result.error || "AI belum dapat menyusun dokumen");
+      if (!response.ok) { const failure = new Error(result.error || "AI belum dapat menyusun dokumen"); failure.status = response.status; throw failure; }
     }
     state.aiResult = result;
     app.querySelector("#generating").classList.remove("show");
@@ -1845,7 +1848,12 @@ async function handleGenerate(event) {
   } catch (cause) {
     app.querySelector("#generating").classList.remove("show");
     form.hidden = false;
-    toast(humanError(cause),"error");
+    const message = humanError(cause);
+    if(errorBanner){
+      errorBanner.textContent = message + " Instruksi Anda tidak dihapus. Pilih Susun dokumen lengkap untuk mencoba kembali.";
+      errorBanner.style.display = "block";
+    }
+    toast(message,"error");
   }
 }
 
