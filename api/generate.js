@@ -175,23 +175,19 @@ export function validateGeneratedDocument(result, type) {
   return { score: Math.max(0, Math.min(100, score)), checks, missingSections, shouldRefine: score < 82 || content.length < blueprint.minimumCharacters * 0.72 || forbidden.length > 0 };
 }
 
-async function currentStandards(type, userKey = "") {
+async function currentStandards(type) {
   const cached = standardsCache.get(type);
   if (cached && Date.now() - cached.createdAt < 30 * 60 * 1000) return cached.value;
-  try {
-    const result = await generateGroundedText({
-      seed: `standards:${type}:${new Date().toISOString().slice(0, 10)}`,
-      systemInstruction: "Anda adalah pemeriksa regulasi pendidikan Indonesia. Gunakan Google Search hanya untuk memeriksa sumber resmi pemerintah. Jangan mengarang nomor, judul, status, atau isi peraturan.",
-      prompt: `Periksa apakah daftar acuan berikut masih berlaku dan apakah ada perubahan yang lebih baru untuk penyusunan ${documentNames[type]}. Batasi sumber pada peraturan.bpk.go.id, peraturan.go.id, jdih.kemendikdasmen.go.id, kemendikdasmen.go.id, guru.kemendikdasmen.go.id, pmp.kemendikdasmen.go.id, dan rumahpendidikan.kemendikdasmen.go.id. Jika tidak dapat memastikan, tulis "belum terverifikasi"; jangan menebak. Ringkas perubahan yang benar-benar relevan.\n\nDAFTAR DASAR TERVERIFIKASI ${STANDARDS_VERIFIED_AT}:\n${standardsContext(type)}`,
-      userKey,
-    });
-    const value = { text: result.text, searched: true, sources: result.sources || [], metadata: result.metadata };
-    standardsCache.set(type, { createdAt: Date.now(), value });
-    return value;
-  } catch (cause) {
-    console.warn("standards grounding unavailable; using verified registry", { status: cause.status, message: cause.message });
-    return { text: `Pemeriksaan web tidak tersedia. Gunakan hanya daftar dasar yang telah diverifikasi pada ${STANDARDS_VERIFIED_AT}.`, searched: false, sources: [], metadata: null };
-  }
+  // The Groq chat endpoint does not browse government sites. Do not spend user
+  // quota asking it to simulate a real-time regulatory check.
+  const value = {
+    text: `Pemeriksaan perubahan regulasi melalui web secara real-time tidak tersedia. Gunakan hanya daftar acuan resmi yang telah diperiksa pada ${STANDARDS_VERIFIED_AT} dan verifikasi status terbaru sebelum pengesahan.`,
+    searched: false,
+    sources: [],
+    metadata: null,
+  };
+  standardsCache.set(type, { createdAt: Date.now(), value });
+  return value;
 }
 
 function schoolPayload(school) {
