@@ -38,7 +38,7 @@ test("structured generation retries a truncated completion instead of accepting 
   assert.deepEqual(attempts.map(({body}) => body.model), models);
 });
 
-test("long KSP composition preserves requested 20,000 output tokens", async t => {
+test("long KSP composition caps output to protect Groq minute quota", async t => {
   const attempts = mockGroq(t, () =>
     Response.json({choices:[{message:{content:'{"title":"KSP"}'},finish_reason:"stop"}]}));
   const result = await generateStructured({
@@ -49,13 +49,13 @@ test("long KSP composition preserves requested 20,000 output tokens", async t =>
   });
   assert.equal(result.title,"KSP");
   assert.equal(attempts.length,1);
-  assert.equal(attempts[0].body.max_completion_tokens,20_000);
+  assert.equal(attempts[0].body.max_completion_tokens,5_500);
 });
 
-test("Groq 429 stops retrying the same personal key across models", async t => {
+test("Groq 429 checks the next model, then returns Retry-After when all models are limited", async t => {
   const attempts = mockGroq(t, () =>
-    Response.json({error:{code:"rate_limit_exceeded"}},{status:429}));
+    Response.json({error:{code:"rate_limit_exceeded"}},{status:429,headers:{"retry-after":"120"}}));
   await assert.rejects(() => testGroqKey(personalKey), error =>
     error.code==="GROQ_RATE_LIMIT" && error.status===429);
-  assert.equal(attempts.length,1);
+  assert.equal(attempts.length,2);
 });
