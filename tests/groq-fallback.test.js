@@ -1,1 +1,39 @@
-aW1wb3J0IGFzc2VydCBmcm9tICJub2RlOmFzc2VydC9zdHJpY3QiOwppbXBvcnQgdGVzdCBmcm9tICJub2RlOnRlc3QiOwppbXBvcnQgeyBnZW5lcmF0ZVN0cnVjdHVyZWQsIHRlc3RHcm9xS2V5IH0gZnJvbSAiLi4vbGliL2dyb3EuanMiOwoKY29uc3QgcGVyc29uYWxLZXkgPSAiZ3NrX3BlcnNvbmFscmVncmVzc2lvbmtleTAxMjM0NTY3ODkiOwpjb25zdCBtb2RlbHMgPSBbIm9wZW5haS9ncHQtb3NzLTEyMGIiLCAib3BlbmFpL2dwdC1vc3MtMjBiIl07CgpmdW5jdGlvbiBtb2NrR3JvcSh0LCBjb21wbGV0ZSkgewogIGNvbnN0IGF0dGVtcHRzID0gW107CiAgdC5tb2NrLm1ldGhvZChnbG9iYWxUaGlzLCAiZmV0Y2giLCBhc3luYyAodXJsLCBvcHRpb25zKSA9PiB7CiAgICBpZiAodXJsLmVuZHNXaXRoKCIvbW9kZWxzIikpIHJldHVybiBSZXNwb25zZS5qc29uKHsgZGF0YTogbW9kZWxzLm1hcChpZCA9PiAoeyBpZCB9KSkgfSk7CiAgICBjb25zdCBib2R5ID0gSlNPTi5wYXJzZShvcHRpb25zLmJvZHkpOwogICAgYXR0ZW1wdHMucHVzaCh7IGJvZHksIGF1dGhvcml6YXRpb246IG9wdGlvbnMuaGVhZGVycy5BdXRob3JpemF0aW9uIH0pOwogICAgcmV0dXJuIGNvbXBsZXRlKGJvZHkpOwogIH0pOwogIHJldHVybiBhdHRlbXB0czsKfQoKdGVzdCgicGVyc29uYWwga2V5IHZlcmlmaWNhdGlvbiBydW5zIGFuIGFjdHVhbCBKU09OIGNvbXBsZXRpb24gYW5kIHRyaWVzIGFub3RoZXIgbW9kZWwgYWZ0ZXIgYSBkZW5pYWwiLCBhc3luYyB0ID0+IHsKICBjb25zdCBhdHRlbXB0cyA9IG1vY2tHcm9xKHQsICh7bW9kZWx9KSA9PiBtb2RlbCA9PT0gbW9kZWxzWzBdCiAgICA/IFJlc3BvbnNlLmpzb24oe2Vycm9yOntjb2RlOiJtb2RlbF9wZXJtaXNzaW9uX2RlbmllZCJ9fSwge3N0YXR1czo0MDN9KQogICAgOiBSZXNwb25zZS5qc29uKHtjaG9pY2VzOlt7bWVzc2FnZTp7Y29udGVudDoneyJvayI6dHJ1ZX0nfX1dfSkpOwogIGNvbnN0IHN0YXR1cyA9IGF3YWl0IHRlc3RHcm9xS2V5KHBlcnNvbmFsS2V5KTsKICBhc3NlcnQuZXF1YWwoc3RhdHVzLm1vZGVsLCBtb2RlbHNbMV0pOwogIGFzc2VydC5kZWVwRXF1YWwoYXR0ZW1wdHMubWFwKCh7Ym9keX0pID0+IGJvZHkubW9kZWwpLCBtb2RlbHMpOwogIGFzc2VydC5vayhhdHRlbXB0cy5ldmVyeSgoe2JvZHksYXV0aG9yaXphdGlvbn0pID0+CiAgICBhdXRob3JpemF0aW9uID09PSAiQmVhcmVyICIgKyBwZXJzb25hbEtleSAmJiBib2R5LnJlc3BvbnNlX2Zvcm1hdC50eXBlID09PSAianNvbl9vYmplY3QiKSk7Cn0pOwoKdGVzdCgic3RydWN0dXJlZCBnZW5lcmF0aW9uIHJldHJpZXMgYSB0cnVuY2F0ZWQgY29tcGxldGlvbiBpbnN0ZWFkIG9mIGFjY2VwdGluZyBicm9rZW4gSlNPTiIsIGFzeW5jIHQgPT4gewogIGNvbnN0IGF0dGVtcHRzID0gbW9ja0dyb3EodCwgKHttb2RlbH0pID0+IG1vZGVsID09PSBtb2RlbHNbMF0KICAgID8gUmVzcG9uc2UuanNvbih7Y2hvaWNlczpbe2ZpbmlzaF9yZWFzb246Imxlbmd0aCIsbWVzc2FnZTp7Y29udGVudDoneyJ0aXRsZSI6J319XX0pCiAgICA6IFJlc3BvbnNlLmpzb24oe2Nob2ljZXM6W3ttZXNzYWdlOntjb250ZW50Oid7InRpdGxlIjoiS1NQIn0nfX1dfSkpOwogIGNvbnN0IHJlc3VsdCA9IGF3YWl0IGdlbmVyYXRlU3RydWN0dXJlZCh7CiAgICBzeXN0ZW1JbnN0cnVjdGlvbjoiU3VzdW4gSlNPTi4iLCBwYXJ0czpbe3RleHQ6IktTUCJ9XSwgdXNlcktleTpwZXJzb25hbEtleSwKICB9KTsKICBhc3NlcnQuZXF1YWwocmVzdWx0LnRpdGxlLCAiS1NQIik7CiAgYXNzZXJ0LmRlZXBFcXVhbChhdHRlbXB0cy5tYXAoKHtib2R5fSkgPT4gYm9keS5tb2RlbCksIG1vZGVscyk7Cn0pOwo=
+import assert from "node:assert/strict";
+import test from "node:test";
+import { generateStructured, testGroqKey } from "../lib/groq.js";
+
+const personalKey = "gsk_personalregressionkey0123456789";
+const models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+
+function mockGroq(t, complete) {
+  const attempts = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url.endsWith("/models")) return Response.json({ data: models.map(id => ({ id })) });
+    const body = JSON.parse(options.body);
+    attempts.push({ body, authorization: options.headers.Authorization });
+    return complete(body);
+  });
+  return attempts;
+}
+
+test("personal key verification runs an actual JSON completion and tries another model after a denial", async t => {
+  const attempts = mockGroq(t, ({model}) => model === models[0]
+    ? Response.json({error:{code:"model_permission_denied"}}, {status:403})
+    : Response.json({choices:[{message:{content:'{"ok":true}'}}]}));
+  const status = await testGroqKey(personalKey);
+  assert.equal(status.model, models[1]);
+  assert.deepEqual(attempts.map(({body}) => body.model), models);
+  assert.ok(attempts.every(({body,authorization}) =>
+    authorization === "Bearer " + personalKey && body.response_format.type === "json_object"));
+});
+
+test("structured generation retries a truncated completion instead of accepting broken JSON", async t => {
+  const attempts = mockGroq(t, ({model}) => model === models[0]
+    ? Response.json({choices:[{finish_reason:"length",message:{content:'{"title":'}}]})
+    : Response.json({choices:[{message:{content:'{"title":"KSP"}'}}]}));
+  const result = await generateStructured({
+    systemInstruction:"Susun JSON.", parts:[{text:"KSP"}], userKey:personalKey,
+  });
+  assert.equal(result.title, "KSP");
+  assert.deepEqual(attempts.map(({body}) => body.model), models);
+});
